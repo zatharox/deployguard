@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: deployguard-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-deployguard}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-deployguard_secret}
+      POSTGRES_DB: ${DB_NAME:-deployguard}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-deployguard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - deployguard-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: deployguard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - deployguard-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deployguard-app
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${DB_USER:-deployguard}:${DB_PASSWORD:-deployguard_secret}@postgres:5432/${DB_NAME:-deployguard}
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # Azure DevOps
+      AZURE_DEVOPS_ORG: ${AZURE_DEVOPS_ORG}
+      AZURE_DEVOPS_PROJECT: ${AZURE_DEVOPS_PROJECT}
+      AZURE_DEVOPS_PAT: ${AZURE_DEVOPS_PAT}
+      
+      # Security
+      SECRET_KEY: ${SECRET_KEY}
+      
+      # App Config
+      DEMO_MODE: ${DEMO_MODE:-False}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # Notifications
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - deployguard-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deployguard-celery
+    command: celery -A services.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-deployguard}:${DB_PASSWORD:-deployguard_secret}@postgres:5432/${DB_NAME:-deployguard}
+      REDIS_URL: redis://redis:6379/0
+      AZURE_DEVOPS_ORG: ${AZURE_DEVOPS_ORG}
+      AZURE_DEVOPS_PROJECT: ${AZURE_DEVOPS_PROJECT}
+      AZURE_DEVOPS_PAT: ${AZURE_DEVOPS_PAT}
+      SECRET_KEY: ${SECRET_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - deployguard-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  deployguard-network:
+    driver: bridge

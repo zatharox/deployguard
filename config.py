@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     medium_risk_threshold: float = 4.0
     max_lines_low_risk: int = 300
     
+    # Notifications
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    slack_webhook_url: str = ""
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

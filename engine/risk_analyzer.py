@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional
 from dataclasses import dataclass
+from datetime import datetime
 import re
 import structlog
 from config import get_settings
@@ -80,6 +81,18 @@ class RiskEngine:
         # Signal 4: Critical Directory Risk
         critical_signal = self._analyze_critical_directories(changes_data)
         signals.append(critical_signal)
+        
+        # Signal 5: Author Risk Profile
+        author_signal = self._analyze_author_risk(pr_data, file_history)
+        signals.append(author_signal)
+        
+        # Signal 6: Time-of-Day Risk
+        time_signal = self._analyze_time_risk(pr_data)
+        signals.append(time_signal)
+        
+        # Signal 7: Dependency Changes Risk
+        dependency_signal = self._analyze_dependency_changes(changes_data)
+        signals.append(dependency_signal)
         
         # Calculate total risk score (0-10 scale)
         total_risk = sum(s.score for s in signals)
@@ -272,6 +285,141 @@ class RiskEngine:
             details=details
         )
     
+    def _analyze_author_risk(self, pr_data: Dict, file_history: Dict[str, float]) -> RiskSignal:
+        """Signal 5: Author experience and past contribution quality"""
+        created_by = pr_data.get("createdBy", {})
+        author_name = created_by.get("displayName", "Unknown")
+        
+        # Simple heuristic: new contributors or contributors with high failure history
+        # In production, this would query historical commit/PR success rates
+        
+        # For demo, use simple rules
+        is_new_contributor = False  # Would check commit history
+        avg_failure_rate = sum(file_history.values()) / max(len(file_history), 1)
+        
+        if avg_failure_rate > 0.3:
+            score = 1.5
+            description = f"Author's modified files have {avg_failure_rate*100:.0f}% historical failure rate"
+        elif avg_failure_rate > 0.15:
+            score = 0.8
+            description = f"Author's modified files have {avg_failure_rate*100:.0f}% historical failure rate"
+        else:
+            score = 0.0
+            description = "Author has good track record on these files"
+        
+        return RiskSignal(
+            name="Author Risk Profile",
+            score=score,
+            description=description,
+            details=f"Author: {author_name}"
+        )
+    
+    def _analyze_time_risk(self, pr_data: Dict) -> RiskSignal:
+        """Signal 6: Deployments late in day/week are riskier"""
+        created_date = pr_data.get("creationDate")
+        
+        if not created_date:
+            return RiskSignal(
+                name="Time-of-Day Risk",
+                score=0.0,
+                description="PR creation time unavailable"
+            )
+        
+        try:
+            # Parse Azure DevOps datetime format
+            dt = datetime.fromisoformat(created_date.replace('Z', '+00:00'))
+            hour = dt.hour
+            weekday = dt.weekday()  # 0=Monday, 6=Sunday
+            
+            # Risk factors:
+            # - After hours (before 8am or after 6pm): +0.5
+            # - Friday: +0.5
+            # - Weekend: +1.0
+            
+            score = 0.0
+            reasons = []
+            
+            if weekday >= 5:  # Weekend
+                score += 1.0
+                reasons.append("weekend deployment")
+            elif weekday == 4:  # Friday
+                score += 0.5
+                reasons.append("Friday deployment")
+            
+            if hour < 8 or hour > 18:
+                score += 0.5
+                reasons.append("after-hours PR")
+            
+            if score > 0:
+                description = f"Elevated risk: {', '.join(reasons)}"
+            else:
+                description = "PR created during safe deployment window"
+            
+            day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][weekday]
+            details = f"Created: {day_name} at {hour:02d}:00"
+            
+            return RiskSignal(
+                name="Time-of-Day Risk",
+                score=min(score, 2.0),
+                description=description,
+                details=details
+            )
+        except Exception as e:
+            logger.warning("time_risk_analysis_failed", error=str(e))
+            return RiskSignal(
+                name="Time-of-Day Risk",
+                score=0.0,
+                description="Could not analyze PR timing"
+            )
+    
+    def _analyze_dependency_changes(self, changes_data: Dict) -> RiskSignal:
+        """Signal 7: Changes to dependency files are high-risk"""
+        dependency_files = [
+            "package.json",
+            "requirements.txt",
+            "pom.xml",
+            "build.gradle",
+            "go.mod",
+            "cargo.toml",
+            "composer.json",
+            "gemfile",
+            ".csproj",
+            "packages.config"
+        ]
+        
+        change_entries = changes_data.get("changeEntries", [])
+        modified_deps = []
+        
+        for entry in change_entries:
+            file_path = entry.get("item", {}).get("path", "").lower()
+            file_name = file_path.split("/")[-1]
+            
+            for dep_file in dependency_files:
+                if dep_file in file_name:
+                    modified_deps.append(file_path)
+                    break
+        
+        if len(modified_deps) >= 2:
+            score = 2.0
+            description = f"Multiple dependency files modified ({len(modified_deps)} files)"
+        elif len(modified_deps) == 1:
+            score = 1.5
+            description = "Dependency file modified - version conflicts possible"
+        else:
+            score = 0.0
+            description = "No dependency file changes"
+        
+        details = None
+        if modified_deps:
+            details = f"Modified: {', '.join([f.split('/')[-1] for f in modified_deps])}"
+        
+        return RiskSignal(
+            name="Dependency Change Risk",
+            score=score,
+            description=description,
+            details=details
+        )
+    
     def _generate_recommendations(
         self, 
         signals: List[RiskSignal], 
@@ -296,6 +444,12 @@ class RiskEngine:
             
             if signal.name == "Critical Directory Risk" and signal.score >= 1.5:
                 recommendations.append("Critical services affected - Ensure rollback plan is ready")
+            
+            if signal.name == "Dependency Change Risk" and signal.score >= 1.5:
+                recommendations.append("Dependency changes detected - Test thoroughly across environments")
+            
+            if signal.name == "Time-of-Day Risk" and signal.score >= 1.0:
+                recommendations.append("Off-hours deployment - Ensure on-call support is available")
         
         if not recommendations:
             recommendations.append("✅ Low risk - Standard review process applies")

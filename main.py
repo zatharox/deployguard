@@ -7,8 +7,11 @@ import structlog
 
 from config import get_settings
 from api.routes import webhook, analysis, health, enterprise, auth
+from api.routes import azure_connectivity, admin
 from db.database import engine, Base
 from services.logging_utils import bind_log_context, clear_log_context, get_request_id
+from services.cache_service import cache_service
+from services.rate_limiter import rate_limit_middleware
 
 # Configure structured logging
 structlog.configure(
@@ -33,17 +36,87 @@ app = FastAPI(
     Predict deployment failures **before** they happen using advanced risk analysis.
     
     ### Features
-    * 🎯 **4-Signal Risk Analysis** - Comprehensive risk scoring
+    * 🎯 **7-Signal Risk Analysis** - Comprehensive risk scoring with ML
     * 🔔 **Automatic PR Comments** - Get insights directly in your PRs
     * 📊 **Analytics Dashboard** - Track trends and patterns
     * ⚡ **Real-time Processing** - Instant risk assessments
+    * 🔐 **Enterprise Multi-Tenancy** - Secure tenant isolation
+    * 🚀 **Notifications** - Email & Slack alerts for high-risk PRs
+    * 📈 **Admin Dashboard** - Comprehensive system management
     
     ### Quick Links
     * [GitHub Profile](https://github.com/zatharox)
     * [Documentation](https://docs.deployguard.dev)
     * [Support](mailto:support@deployguard.dev)
+    
+    ### Authentication
+    
+    This API supports multiple authentication methods:
+    
+    1. **JWT Bearer Token** (for user authentication):
+       ```bash
+       # Login to get token
+       curl -X POST https://api.deployguard.dev/api/v1/auth/login \\
+         -H "Content-Type: application/json" \\
+         -d '{"email": "user@example.com", "password": "your_password"}'
+       
+       # Use token in requests
+       curl -H "Authorization: Bearer <your_token>" \\
+            -H "X-Tenant-Slug: your-tenant" \\
+            https://api.deployguard.dev/api/v1/analysis/demo/run/high
+       ```
+    
+    2. **API Key** (for service-to-service):
+       ```bash
+       curl -H "X-API-Key: <your_api_key>" \\
+            -H "X-Tenant-Slug: your-tenant" \\
+            https://api.deployguard.dev/api/v1/webhook/azure-devops
+       ```
+    
+    ### Example: Analyze a PR
+    
+    ```python
+    import requests
+    
+    # Get authentication token
+    auth_response = requests.post(
+        "https://api.deployguard.dev/api/v1/auth/login",
+        json={"email": "user@example.com", "password": "password"}
+    )
+    token = auth_response.json()["access_token"]
+    
+    # Run risk analysis
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Tenant-Slug": "your-tenant"
+    }
+    
+    analysis = requests.post(
+        "https://api.deployguard.dev/api/v1/analysis/manual",
+        headers=headers,
+        json={
+            "repository_id": "your-repo-id",
+            "pr_id": 123
+        }
+    )
+    
+    print(f"Risk Level: {analysis.json()['risk_level']}")
+    print(f"Risk Score: {analysis.json()['risk_score']}")
+    ```
+    
+    ### Webhook Setup
+    
+    Configure Azure DevOps to send PR events:
+    
+    1. Navigate to Project Settings → Service Hooks
+    2. Create Web Hook subscription
+    3. Set URL: `https://your-domain.com/api/v1/webhook/azure-devops`
+    4. Add headers:
+       - `X-Tenant-Slug`: your-tenant
+       - `X-API-Key`: your-api-key
+    
     """,
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     contact={
@@ -90,6 +163,11 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def rate_limiting_middleware(request: Request, call_next):
+    return await rate_limit_middleware(request, call_next)
+
+
+@app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
     request_id = get_request_id(request.headers.get("X-Request-ID"))
     start = time.perf_counter()
@@ -121,6 +199,8 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(webhook.router, prefix="/api/v1/webhook", tags=["webhook"])
 app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"])
 app.include_router(enterprise.router, prefix="/api/v1/enterprise", tags=["enterprise"])
+app.include_router(azure_connectivity.router, prefix="/api/v1/azure", tags=["azure-connectivity"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 # Custom landing page
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -907,6 +987,7 @@ async def landing_page():
 @app.on_event("startup")
 async def startup_event():
     settings = get_settings()
+    await cache_service.connect()
     logger.info("starting_deployguard", 
                 org=settings.azure_devops_org,
                 project=settings.azure_devops_project)
@@ -914,6 +995,7 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    await cache_service.close()
     logger.info("shutting_down_deployguard")
 
 
