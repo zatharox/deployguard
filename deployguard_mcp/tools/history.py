@@ -29,32 +29,18 @@ def get_historical_risk(
     db = SessionLocal()
 
     try:
-        query = db.query(FileHistory).filter(
-            FileHistory.file_path.in_(paths)
-        )
+        query = db.query(FileHistory).filter(FileHistory.file_path.in_(paths))
 
         if tenant_id is not None:
-            query = query.filter(
-                FileHistory.tenant_id == tenant_id
-            )
+            query = query.filter(FileHistory.tenant_id == tenant_id)
 
         file_history = query.all()
 
-        changes = sum(
-            item.change_count or 0
-            for item in file_history
-        )
+        changes = sum(item.change_count or 0 for item in file_history)
 
-        failed_changes = sum(
-            item.failure_count or 0
-            for item in file_history
-        )
+        failed_changes = sum(item.failure_count or 0 for item in file_history)
 
-        failure_rate = (
-            failed_changes / changes
-            if changes > 0
-            else 0.0
-        )
+        failure_rate = failed_changes / changes if changes > 0 else 0.0
 
         return {
             "repository_id": repository_id,

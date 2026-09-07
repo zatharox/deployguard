@@ -7,11 +7,16 @@ from collections import Counter
 
 import httpx
 
-
 SCENARIOS = ["low", "medium", "high", "critical"]
 
 
-async def worker(base_url: str, requests_per_user: int, reset_first: bool, semaphore: asyncio.Semaphore, stats: dict):
+async def worker(
+    base_url: str,
+    requests_per_user: int,
+    reset_first: bool,
+    semaphore: asyncio.Semaphore,
+    stats: dict,
+):
     async with httpx.AsyncClient(timeout=30.0) as client:
         for i in range(requests_per_user):
             scenario = random.choice(SCENARIOS)
@@ -36,7 +41,13 @@ async def worker(base_url: str, requests_per_user: int, reset_first: bool, semap
                     stats["errors"] += 1
 
 
-async def run_simulation(base_url: str, users: int, requests_per_user: int, max_in_flight: int, reset_first: bool):
+async def run_simulation(
+    base_url: str,
+    users: int,
+    requests_per_user: int,
+    max_in_flight: int,
+    reset_first: bool,
+):
     stats = {
         "success": 0,
         "errors": 0,
@@ -66,7 +77,11 @@ async def run_simulation(base_url: str, users: int, requests_per_user: int, max_
     print(f"Requests per user: {requests_per_user}")
     print(f"Total requests: {total_requests}")
     print(f"Duration: {duration:.2f}s")
-    print(f"Throughput: {total_requests / duration:.2f} req/s" if duration > 0 else "Throughput: N/A")
+    print(
+        f"Throughput: {total_requests / duration:.2f} req/s"
+        if duration > 0
+        else "Throughput: N/A"
+    )
     print(f"Success: {stats['success']}")
     print(f"Errors: {stats['errors']}")
     print(f"Error rate: {(stats['errors'] / total_requests) * 100:.2f}%")
@@ -85,12 +100,26 @@ async def run_simulation(base_url: str, users: int, requests_per_user: int, max_
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run production-like load simulation for DeployGuard")
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000", help="DeployGuard base URL")
-    parser.add_argument("--users", type=int, default=20, help="Concurrent virtual users")
-    parser.add_argument("--requests-per-user", type=int, default=25, help="Requests per user")
-    parser.add_argument("--max-in-flight", type=int, default=50, help="Max in-flight requests")
-    parser.add_argument("--reset-first", action="store_true", help="Reset DB only on first request per user")
+    parser = argparse.ArgumentParser(
+        description="Run production-like load simulation for DeployGuard"
+    )
+    parser.add_argument(
+        "--base-url", default="http://127.0.0.1:8000", help="DeployGuard base URL"
+    )
+    parser.add_argument(
+        "--users", type=int, default=20, help="Concurrent virtual users"
+    )
+    parser.add_argument(
+        "--requests-per-user", type=int, default=25, help="Requests per user"
+    )
+    parser.add_argument(
+        "--max-in-flight", type=int, default=50, help="Max in-flight requests"
+    )
+    parser.add_argument(
+        "--reset-first",
+        action="store_true",
+        help="Reset DB only on first request per user",
+    )
     return parser.parse_args()
 
 

@@ -15,9 +15,7 @@ class MockAzureDevOpsClient:
         return {
             "pullRequestId": pr_id,
             "title": f"Demo PR #{pr_id}",
-            "createdBy": {
-                "displayName": "Demo Engineer"
-            },
+            "createdBy": {"displayName": "Demo Engineer"},
         }
 
     async def get_pr_changes(
@@ -134,11 +132,7 @@ class MockAzureDevOpsClient:
         for i in range(top):
 
             result = (
-                "failed"
-                if i % 6 == 0
-                else "canceled"
-                if i % 19 == 0
-                else "succeeded"
+                "failed" if i % 6 == 0 else "canceled" if i % 19 == 0 else "succeeded"
             )
 
             runs.append(

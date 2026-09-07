@@ -18,7 +18,7 @@ structlog.configure(
     processors=[
         structlog.contextvars.merge_contextvars,
         structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ]
 )
 
@@ -122,34 +122,25 @@ app = FastAPI(
     contact={
         "name": "DeployGuard Team",
         "email": "support@deployguard.dev",
-        "url": "https://deployguard.dev"
+        "url": "https://deployguard.dev",
     },
-    license_info={
-        "name": "MIT License",
-        "url": "https://opensource.org/licenses/MIT"
-    },
+    license_info={"name": "MIT License", "url": "https://opensource.org/licenses/MIT"},
     openapi_tags=[
         {
             "name": "health",
-            "description": "🏥 Health check and system status endpoints"
+            "description": "🏥 Health check and system status endpoints",
         },
         {
             "name": "webhook",
-            "description": "🔗 Azure DevOps webhook handlers for PR events"
+            "description": "🔗 Azure DevOps webhook handlers for PR events",
         },
-        {
-            "name": "analysis",
-            "description": "📊 Risk analysis and analytics endpoints"
-        },
+        {"name": "analysis", "description": "📊 Risk analysis and analytics endpoints"},
         {
             "name": "enterprise",
-            "description": "🏢 Enterprise tenant and account management"
+            "description": "🏢 Enterprise tenant and account management",
         },
-        {
-            "name": "auth",
-            "description": "🔐 Authentication and access control"
-        }
-    ]
+        {"name": "auth", "description": "🔐 Authentication and access control"},
+    ],
 )
 
 # CORS middleware
@@ -189,9 +180,12 @@ async def request_logging_middleware(request: Request, call_next):
 
     duration_ms = round((time.perf_counter() - start) * 1000, 2)
     response.headers["X-Request-ID"] = request_id
-    logger.info("request_completed", status_code=response.status_code, duration_ms=duration_ms)
+    logger.info(
+        "request_completed", status_code=response.status_code, duration_ms=duration_ms
+    )
     clear_log_context()
     return response
+
 
 # Include routers
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
@@ -199,8 +193,11 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(webhook.router, prefix="/api/v1/webhook", tags=["webhook"])
 app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"])
 app.include_router(enterprise.router, prefix="/api/v1/enterprise", tags=["enterprise"])
-app.include_router(azure_connectivity.router, prefix="/api/v1/azure", tags=["azure-connectivity"])
+app.include_router(
+    azure_connectivity.router, prefix="/api/v1/azure", tags=["azure-connectivity"]
+)
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+
 
 # Custom landing page
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -988,9 +985,11 @@ async def landing_page():
 async def startup_event():
     settings = get_settings()
     await cache_service.connect()
-    logger.info("starting_deployguard", 
-                org=settings.azure_devops_org,
-                project=settings.azure_devops_project)
+    logger.info(
+        "starting_deployguard",
+        org=settings.azure_devops_org,
+        project=settings.azure_devops_project,
+    )
 
 
 @app.on_event("shutdown")
@@ -1001,10 +1000,11 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
+
     settings = get_settings()
     uvicorn.run(
         "main:app",
         host=settings.api_host,
         port=settings.api_port,
-        reload=settings.debug
+        reload=settings.debug,
     )

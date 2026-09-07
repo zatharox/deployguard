@@ -23,10 +23,14 @@ def enforce_analysis_quota(db: Session, tenant: Tenant):
     daily_limit = limits["analyses_per_day"]
 
     today = datetime.utcnow().date().isoformat()
-    today_count = db.query(PRAnalysis).filter(
-        PRAnalysis.tenant_id == tenant.id,
-        func.date(PRAnalysis.analyzed_at) == today,
-    ).count()
+    today_count = (
+        db.query(PRAnalysis)
+        .filter(
+            PRAnalysis.tenant_id == tenant.id,
+            func.date(PRAnalysis.analyzed_at) == today,
+        )
+        .count()
+    )
 
     if today_count >= daily_limit:
         raise HTTPException(

@@ -18,14 +18,10 @@ def get_risk_score(
     db = SessionLocal()
 
     try:
-        query = db.query(PRAnalysis).filter(
-            PRAnalysis.id == analysis_id
-        )
+        query = db.query(PRAnalysis).filter(PRAnalysis.id == analysis_id)
 
         if tenant_id is not None:
-            query = query.filter(
-                PRAnalysis.tenant_id == tenant_id
-            )
+            query = query.filter(PRAnalysis.tenant_id == tenant_id)
 
         analysis = query.first()
 
@@ -43,9 +39,7 @@ def get_risk_score(
             "risk_score": analysis.risk_score,
             "risk_level": analysis.risk_level,
             "analyzed_at": (
-                analysis.analyzed_at.isoformat()
-                if analysis.analyzed_at
-                else None
+                analysis.analyzed_at.isoformat() if analysis.analyzed_at else None
             ),
         }
 
@@ -64,14 +58,10 @@ def get_risk_explanation(
     db = SessionLocal()
 
     try:
-        query = db.query(PRAnalysis).filter(
-            PRAnalysis.id == analysis_id
-        )
+        query = db.query(PRAnalysis).filter(PRAnalysis.id == analysis_id)
 
         if tenant_id is not None:
-            query = query.filter(
-                PRAnalysis.tenant_id == tenant_id
-            )
+            query = query.filter(PRAnalysis.tenant_id == tenant_id)
 
         analysis = query.first()
 
@@ -82,16 +72,12 @@ def get_risk_explanation(
             }
 
         try:
-            signals = json.loads(
-                analysis.signals or "[]"
-            )
+            signals = json.loads(analysis.signals or "[]")
         except json.JSONDecodeError:
             signals = []
 
         try:
-            recommendations = json.loads(
-                analysis.recommendations or "[]"
-            )
+            recommendations = json.loads(analysis.recommendations or "[]")
         except json.JSONDecodeError:
             recommendations = []
 

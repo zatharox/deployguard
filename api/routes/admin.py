@@ -1,6 +1,7 @@
 """
 Admin dashboard for tenant and system management
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
@@ -19,12 +20,12 @@ logger = structlog.get_logger()
 @router.get("/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(
     current_user: User = Depends(get_current_user),
-    _role_check = Depends(require_roles(["owner", "admin"]))
+    _role_check=Depends(require_roles(["owner", "admin"])),
 ):
     """
     Admin dashboard for managing tenants, users, and system metrics
     """
-    
+
     return """
     <!DOCTYPE html>
     <html lang="en">
@@ -283,18 +284,20 @@ async def admin_dashboard(
 async def get_system_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _role_check = Depends(require_roles(["owner", "admin"]))
+    _role_check=Depends(require_roles(["owner", "admin"])),
 ):
     """Get system-wide statistics"""
-    
+
     total_tenants = db.query(Tenant).count()
     total_users = db.query(User).count()
     total_analyses = db.query(PRAnalysis).count()
-    high_risk_count = db.query(PRAnalysis).filter(PRAnalysis.risk_level == "high").count()
-    
+    high_risk_count = (
+        db.query(PRAnalysis).filter(PRAnalysis.risk_level == "high").count()
+    )
+
     return {
         "total_tenants": total_tenants,
         "total_users": total_users,
         "total_analyses": total_analyses,
-        "high_risk_count": high_risk_count
+        "high_risk_count": high_risk_count,
     }

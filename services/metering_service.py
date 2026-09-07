@@ -28,12 +28,17 @@ def record_usage_event(
 
 def usage_summary_for_today(db: Session, tenant_id: int) -> dict:
     today = datetime.utcnow().date().isoformat()
-    rows = db.query(
-        UsageEvent.event_type,
-        func.sum(UsageEvent.quantity),
-    ).filter(
-        UsageEvent.tenant_id == tenant_id,
-        func.date(UsageEvent.created_at) == today,
-    ).group_by(UsageEvent.event_type).all()
+    rows = (
+        db.query(
+            UsageEvent.event_type,
+            func.sum(UsageEvent.quantity),
+        )
+        .filter(
+            UsageEvent.tenant_id == tenant_id,
+            func.date(UsageEvent.created_at) == today,
+        )
+        .group_by(UsageEvent.event_type)
+        .all()
+    )
 
     return {event_type: int(total or 0) for event_type, total in rows}

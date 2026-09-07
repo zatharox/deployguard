@@ -27,7 +27,9 @@ def verify_password(plain_password: str, password_hash: Optional[str]) -> bool:
     return pwd_context.verify(plain_password, password_hash)
 
 
-def create_access_token(user_id: int, tenant_slug: str, role: str, expires_minutes: int = 60) -> str:
+def create_access_token(
+    user_id: int, tenant_slug: str, role: str, expires_minutes: int = 60
+) -> str:
     settings = get_settings()
     expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
     payload = {
@@ -74,10 +76,14 @@ def require_roles(allowed_roles: list[str]):
         db: Session = Depends(get_db),
     ):
         tenant: Tenant = resolve_tenant(db, x_tenant_slug)
-        membership = db.query(Membership).filter(
-            Membership.user_id == user.id,
-            Membership.tenant_id == tenant.id,
-        ).first()
+        membership = (
+            db.query(Membership)
+            .filter(
+                Membership.user_id == user.id,
+                Membership.tenant_id == tenant.id,
+            )
+            .first()
+        )
         if not membership:
             raise HTTPException(status_code=403, detail="No tenant membership")
         if membership.role not in allowed_roles:
@@ -106,11 +112,15 @@ async def require_api_key(
 
     tenant: Tenant = resolve_tenant(db, x_tenant_slug)
     key_hash = hash_api_key(x_api_key)
-    api_key = db.query(TenantApiKey).filter(
-        TenantApiKey.key_hash == key_hash,
-        TenantApiKey.tenant_id == tenant.id,
-        TenantApiKey.is_active == 1,
-    ).first()
+    api_key = (
+        db.query(TenantApiKey)
+        .filter(
+            TenantApiKey.key_hash == key_hash,
+            TenantApiKey.tenant_id == tenant.id,
+            TenantApiKey.is_active == 1,
+        )
+        .first()
+    )
     if not api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 

@@ -5,20 +5,20 @@ from integrations.azure_devops import AzureDevOpsClient
 router = APIRouter()
 
 
-@router.get("/health", summary="🏥 Health Check", description="Check if the DeployGuard API is healthy and operational")
+@router.get(
+    "/health",
+    summary="🏥 Health Check",
+    description="Check if the DeployGuard API is healthy and operational",
+)
 async def health_check():
     """Health check endpoint - Returns system status"""
-    return {
-        "status": "healthy",
-        "service": "DeployGuard",
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "service": "DeployGuard", "version": "1.0.0"}
 
 
 @router.get(
     "/health/azure-devops",
     summary="🔌 Azure DevOps Connectivity",
-    description="Validate Azure DevOps auth and Pipeline API connectivity"
+    description="Validate Azure DevOps auth and Pipeline API connectivity",
 )
 async def azure_devops_health_check():
     """Checks whether DeployGuard can read Azure DevOps pipeline runs."""
@@ -44,7 +44,9 @@ async def azure_devops_health_check():
         }
 
 
-@router.get("/", summary="🏠 API Info", description="Get basic API information and links")
+@router.get(
+    "/", summary="🏠 API Info", description="Get basic API information and links"
+)
 async def root():
     """Root endpoint with API information"""
     return {
@@ -52,5 +54,5 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "redoc": "/redoc",
-        "health": "/api/v1/health"
+        "health": "/api/v1/health",
     }

@@ -10,7 +10,6 @@ from integrations.azure_devops import AzureDevOpsClient
 from integrations.mock_azure_devops import MockAzureDevOpsClient
 from config import get_settings
 
-
 logger = structlog.get_logger()
 
 
@@ -28,9 +27,7 @@ class AnalysisService:
         settings = get_settings()
 
         self.azure_client = (
-            MockAzureDevOpsClient()
-            if settings.demo_mode
-            else AzureDevOpsClient()
+            MockAzureDevOpsClient() if settings.demo_mode else AzureDevOpsClient()
         )
 
         self.risk_engine = RiskEngine()
@@ -141,9 +138,7 @@ class AnalysisService:
             pr_id=pr_id,
         )
 
-        comment_text = self.risk_engine.format_pr_comment(
-            result
-        )
+        comment_text = self.risk_engine.format_pr_comment(result)
 
         await self.azure_client.post_pr_comment(
             repository_id=repository_id,
@@ -163,21 +158,14 @@ class AnalysisService:
             }
         """
 
-        query = self.db.query(FileHistory).filter(
-            FileHistory.change_count > 0
-        )
+        query = self.db.query(FileHistory).filter(FileHistory.change_count > 0)
 
         if self.tenant_id is not None:
-            query = query.filter(
-                FileHistory.tenant_id == self.tenant_id
-            )
+            query = query.filter(FileHistory.tenant_id == self.tenant_id)
 
         files = query.all()
 
-        return {
-            file.file_path: file.failure_rate
-            for file in files
-        }
+        return {file.file_path: file.failure_rate for file in files}
 
     async def _get_pipeline_stats(self) -> Dict:
         """
@@ -193,12 +181,8 @@ class AnalysisService:
 
         total_runs = total_runs_query.count()
 
-        failed_runs_query = self.db.query(
-            PipelineHistory
-        ).filter(
-            PipelineHistory.status.in_(
-                ["failed", "canceled"]
-            )
+        failed_runs_query = self.db.query(PipelineHistory).filter(
+            PipelineHistory.status.in_(["failed", "canceled"])
         )
 
         if self.tenant_id is not None:
@@ -213,58 +197,34 @@ class AnalysisService:
         # ---------------------------------------------------------
         if total_runs == 0:
 
-            logger.info(
-                "fetching_pipeline_history_from_azure"
-            )
+            logger.info("fetching_pipeline_history_from_azure")
 
-            runs = await self.azure_client.get_pipeline_runs(
-                top=100
-            )
+            runs = await self.azure_client.get_pipeline_runs(top=100)
 
             for run in runs:
 
                 existing = (
                     self.db.query(PipelineHistory)
-                    .filter(
-                        PipelineHistory.run_id == run.get("id")
-                    )
+                    .filter(PipelineHistory.run_id == run.get("id"))
                     .first()
                 )
 
                 if existing:
                     continue
 
-                pipeline_info = run.get(
-                    "pipeline",
-                    {}
-                )
+                pipeline_info = run.get("pipeline", {})
 
-                source_commit = run.get(
-                    "sourceCommit"
-                ) or {}
+                source_commit = run.get("sourceCommit") or {}
 
                 pipeline_run = PipelineHistory(
                     tenant_id=self.tenant_id,
-                    pipeline_id=pipeline_info.get(
-                        "id"
-                    ) or 0,
-                    pipeline_name=pipeline_info.get(
-                        "name"
-                    ),
+                    pipeline_id=pipeline_info.get("id") or 0,
+                    pipeline_name=pipeline_info.get("name"),
                     run_id=run.get("id"),
-                    status=run.get(
-                        "result"
-                    ) or run.get(
-                        "state",
-                        "unknown"
-                    ),
+                    status=run.get("result") or run.get("state", "unknown"),
                     result=run.get("result"),
-                    commit_id=source_commit.get(
-                        "commitId"
-                    ),
-                    branch=run.get(
-                        "sourceBranch"
-                    ),
+                    commit_id=source_commit.get("commitId"),
+                    branch=run.get("sourceBranch"),
                 )
 
                 self.db.add(pipeline_run)
@@ -274,10 +234,7 @@ class AnalysisService:
             total_runs = len(runs)
 
             failed_runs = sum(
-                1
-                for run in runs
-                if run.get("result")
-                in ["failed", "canceled"]
+                1 for run in runs if run.get("result") in ["failed", "canceled"]
             )
 
         return {
@@ -298,54 +255,30 @@ class AnalysisService:
         Actual diff statistics are stored when available.
         """
 
-        change_entries = changes_data.get(
-            "changeEntries",
-            []
-        )
+        change_entries = changes_data.get("changeEntries", [])
 
-        diff_stats = changes_data.get(
-            "diffStats"
-        ) or {}
+        diff_stats = changes_data.get("diffStats") or {}
 
-        files_changed = diff_stats.get(
-            "files_changed"
-        )
+        files_changed = diff_stats.get("files_changed")
 
         if files_changed is None:
             files_changed = len(change_entries)
 
-        lines_changed = diff_stats.get(
-            "lines_changed"
-        )
+        lines_changed = diff_stats.get("lines_changed")
 
         if lines_changed is not None:
             lines_changed = int(lines_changed)
 
         pr_analysis = PRAnalysis(
             tenant_id=self.tenant_id,
-            pr_id=pr_data.get(
-                "pullRequestId"
-            ),
+            pr_id=pr_data.get("pullRequestId"),
             repository_id=repository_id,
             risk_score=result.risk_score,
             risk_level=result.risk_level,
-            signals=json.dumps(
-                [s.__dict__ for s in result.signals]
-            ),
-            recommendations=json.dumps(
-                result.recommendations
-            ),
-            pr_title=pr_data.get(
-                "title"
-            ),
-            pr_author=(
-                pr_data.get(
-                    "createdBy",
-                    {}
-                ).get(
-                    "displayName"
-                )
-            ),
+            signals=json.dumps([s.__dict__ for s in result.signals]),
+            recommendations=json.dumps(result.recommendations),
+            pr_title=pr_data.get("title"),
+            pr_author=(pr_data.get("createdBy", {}).get("displayName")),
             files_changed=files_changed,
             lines_changed=lines_changed,
         )
@@ -371,16 +304,10 @@ class AnalysisService:
         Update file modification/failure history.
         """
 
-        query = self.db.query(
-            FileHistory
-        ).filter(
-            FileHistory.file_path == file_path
-        )
+        query = self.db.query(FileHistory).filter(FileHistory.file_path == file_path)
 
         if self.tenant_id is not None:
-            query = query.filter(
-                FileHistory.tenant_id == self.tenant_id
-            )
+            query = query.filter(FileHistory.tenant_id == self.tenant_id)
 
         file_history = query.first()
 
