@@ -64,6 +64,10 @@ jobs:
         REDIS_URL: redis://localhost:6379/0
         SECRET_KEY: test-secret-key-for-ci
         DEMO_MODE: "True"
+        AZURE_DEVOPS_ORG: test-org
+        AZURE_DEVOPS_PAT: test-pat
+        AZURE_DEVOPS_PROJECT: test-project
+        WEBHOOK_SECRET: test-webhook-secret
       run: |
         pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
     
