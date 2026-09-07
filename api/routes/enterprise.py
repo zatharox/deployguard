@@ -31,10 +31,19 @@ async def list_tenants(
     db: Session = Depends(get_db),
 ):
     get_or_create_default_tenant(db)
-    memberships = db.query(Membership).filter(Membership.user_id == auth["user"].id).all()
+    memberships = (
+        db.query(Membership).filter(Membership.user_id == auth["user"].id).all()
+    )
     tenant_ids = [m.tenant_id for m in memberships]
-    tenants = db.query(Tenant).filter(Tenant.id.in_(tenant_ids)).order_by(Tenant.created_at.desc()).all()
-    logger.info("enterprise_tenants_listed", user_id=auth["user"].id, count=len(tenants))
+    tenants = (
+        db.query(Tenant)
+        .filter(Tenant.id.in_(tenant_ids))
+        .order_by(Tenant.created_at.desc())
+        .all()
+    )
+    logger.info(
+        "enterprise_tenants_listed", user_id=auth["user"].id, count=len(tenants)
+    )
     return {
         "count": len(tenants),
         "tenants": [
@@ -52,7 +61,9 @@ async def list_tenants(
 
 @router.post("/tenants", summary="➕ Create Tenant")
 async def create_tenant(payload: TenantCreateRequest, db: Session = Depends(get_db)):
-    logger.info("enterprise_tenant_create_attempt", slug=payload.slug, plan=payload.plan)
+    logger.info(
+        "enterprise_tenant_create_attempt", slug=payload.slug, plan=payload.plan
+    )
     existing = db.query(Tenant).filter(Tenant.slug == payload.slug).first()
     if existing:
         logger.warning("enterprise_tenant_create_conflict", slug=payload.slug)
@@ -67,7 +78,12 @@ async def create_tenant(payload: TenantCreateRequest, db: Session = Depends(get_
     db.add(tenant)
     db.commit()
     db.refresh(tenant)
-    logger.info("enterprise_tenant_created", tenant_id=tenant.id, slug=tenant.slug, plan=tenant.plan)
+    logger.info(
+        "enterprise_tenant_created",
+        tenant_id=tenant.id,
+        slug=tenant.slug,
+        plan=tenant.plan,
+    )
 
     return {
         "status": "success",
@@ -92,10 +108,14 @@ async def get_tenant_usage(
         raise HTTPException(status_code=403, detail="Tenant header mismatch")
 
     limits = get_plan_limits(tenant.plan)
-    today_count = db.query(PRAnalysis).filter(
-        PRAnalysis.tenant_id == tenant.id,
-        func.date(PRAnalysis.analyzed_at) == func.date(func.now()),
-    ).count()
+    today_count = (
+        db.query(PRAnalysis)
+        .filter(
+            PRAnalysis.tenant_id == tenant.id,
+            func.date(PRAnalysis.analyzed_at) == func.date(func.now()),
+        )
+        .count()
+    )
 
     metering = usage_summary_for_today(db, tenant.id)
     logger.info("enterprise_usage_viewed", tenant_slug=tenant.slug, plan=tenant.plan)
@@ -118,7 +138,12 @@ async def list_api_keys(
     db: Session = Depends(get_db),
 ):
     tenant = auth["tenant"]
-    keys = db.query(TenantApiKey).filter(TenantApiKey.tenant_id == tenant.id).order_by(TenantApiKey.created_at.desc()).all()
+    keys = (
+        db.query(TenantApiKey)
+        .filter(TenantApiKey.tenant_id == tenant.id)
+        .order_by(TenantApiKey.created_at.desc())
+        .all()
+    )
     logger.info("enterprise_api_keys_listed", tenant_slug=tenant.slug, count=len(keys))
     return {
         "tenant": tenant.slug,
@@ -153,7 +178,12 @@ async def create_api_key(
     db.add(key)
     db.commit()
     db.refresh(key)
-    logger.info("enterprise_api_key_created", tenant_slug=tenant.slug, key_id=key.id, label=key.label)
+    logger.info(
+        "enterprise_api_key_created",
+        tenant_slug=tenant.slug,
+        key_id=key.id,
+        label=key.label,
+    )
 
     return {
         "status": "success",
@@ -175,12 +205,18 @@ async def revoke_api_key(
     db: Session = Depends(get_db),
 ):
     tenant = auth["tenant"]
-    key = db.query(TenantApiKey).filter(
-        TenantApiKey.id == key_id,
-        TenantApiKey.tenant_id == tenant.id,
-    ).first()
+    key = (
+        db.query(TenantApiKey)
+        .filter(
+            TenantApiKey.id == key_id,
+            TenantApiKey.tenant_id == tenant.id,
+        )
+        .first()
+    )
     if not key:
-        logger.warning("enterprise_api_key_revoke_missing", tenant_slug=tenant.slug, key_id=key_id)
+        logger.warning(
+            "enterprise_api_key_revoke_missing", tenant_slug=tenant.slug, key_id=key_id
+        )
         raise HTTPException(status_code=404, detail="API key not found")
 
     key.is_active = 0

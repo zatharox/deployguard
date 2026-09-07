@@ -34,7 +34,11 @@ class LoginRequest(BaseModel):
 
 @router.post("/register", summary="🧾 Register User")
 async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    logger.info("auth_register_attempt", email=mask_email(payload.email), tenant_slug=payload.tenant_slug)
+    logger.info(
+        "auth_register_attempt",
+        email=mask_email(payload.email),
+        tenant_slug=payload.tenant_slug,
+    )
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         logger.warning("auth_register_conflict", email=mask_email(payload.email))
@@ -60,7 +64,12 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
 
     token = create_access_token(user.id, tenant.slug, membership.role)
-    logger.info("auth_register_success", user_id=user.id, tenant_slug=tenant.slug, role=membership.role)
+    logger.info(
+        "auth_register_success",
+        user_id=user.id,
+        tenant_slug=tenant.slug,
+        role=membership.role,
+    )
     return {
         "status": "success",
         "access_token": token,
@@ -72,23 +81,38 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", summary="🔐 Login")
 async def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    logger.info("auth_login_attempt", email=mask_email(payload.email), tenant_slug=payload.tenant_slug)
+    logger.info(
+        "auth_login_attempt",
+        email=mask_email(payload.email),
+        tenant_slug=payload.tenant_slug,
+    )
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         logger.warning("auth_login_failed", email=mask_email(payload.email))
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     tenant = resolve_tenant(db, payload.tenant_slug)
-    membership = db.query(Membership).filter(
-        Membership.user_id == user.id,
-        Membership.tenant_id == tenant.id,
-    ).first()
+    membership = (
+        db.query(Membership)
+        .filter(
+            Membership.user_id == user.id,
+            Membership.tenant_id == tenant.id,
+        )
+        .first()
+    )
     if not membership:
-        logger.warning("auth_login_no_membership", user_id=user.id, tenant_slug=tenant.slug)
+        logger.warning(
+            "auth_login_no_membership", user_id=user.id, tenant_slug=tenant.slug
+        )
         raise HTTPException(status_code=403, detail="No membership in tenant")
 
     token = create_access_token(user.id, tenant.slug, membership.role)
-    logger.info("auth_login_success", user_id=user.id, tenant_slug=tenant.slug, role=membership.role)
+    logger.info(
+        "auth_login_success",
+        user_id=user.id,
+        tenant_slug=tenant.slug,
+        role=membership.role,
+    )
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -104,10 +128,14 @@ async def me(
     db: Session = Depends(get_db),
 ):
     tenant = resolve_tenant(db, x_tenant_slug)
-    membership = db.query(Membership).filter(
-        Membership.user_id == user.id,
-        Membership.tenant_id == tenant.id,
-    ).first()
+    membership = (
+        db.query(Membership)
+        .filter(
+            Membership.user_id == user.id,
+            Membership.tenant_id == tenant.id,
+        )
+        .first()
+    )
 
     return {
         "user": {
@@ -142,10 +170,14 @@ async def demo_bootstrap(db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
 
-    membership = db.query(Membership).filter(
-        Membership.user_id == user.id,
-        Membership.tenant_id == tenant.id,
-    ).first()
+    membership = (
+        db.query(Membership)
+        .filter(
+            Membership.user_id == user.id,
+            Membership.tenant_id == tenant.id,
+        )
+        .first()
+    )
     if not membership:
         membership = Membership(
             tenant_id=tenant.id,
@@ -156,7 +188,12 @@ async def demo_bootstrap(db: Session = Depends(get_db)):
         db.commit()
 
     token = create_access_token(user.id, tenant.slug, membership.role)
-    logger.info("auth_demo_bootstrap", user_id=user.id, tenant_slug=tenant.slug, role=membership.role)
+    logger.info(
+        "auth_demo_bootstrap",
+        user_id=user.id,
+        tenant_slug=tenant.slug,
+        role=membership.role,
+    )
     return {
         "status": "success",
         "access_token": token,

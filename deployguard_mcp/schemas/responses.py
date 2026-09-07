@@ -14,12 +14,8 @@ class RiskAnalysisResponse(BaseModel):
     analysis_id: int | None = None
     risk_score: float
     risk_level: str
-    signals: list[RiskSignalResponse] = Field(
-        default_factory=list
-    )
-    recommendations: list[str] = Field(
-        default_factory=list
-    )
+    signals: list[RiskSignalResponse] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
 
 
 class RiskScoreResponse(BaseModel):

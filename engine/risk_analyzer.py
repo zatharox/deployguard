@@ -7,7 +7,6 @@ import structlog
 
 from config import get_settings
 
-
 logger = structlog.get_logger()
 
 
@@ -72,11 +71,7 @@ class RiskEngine:
         signals: List[RiskSignal] = []
 
         # Signal 1
-        signals.append(
-            self._analyze_commit_size(
-                changes_data
-            )
-        )
+        signals.append(self._analyze_commit_size(changes_data))
 
         # Signal 2
         signals.append(
@@ -87,18 +82,10 @@ class RiskEngine:
         )
 
         # Signal 3
-        signals.append(
-            self._analyze_pipeline_history(
-                pipeline_stats
-            )
-        )
+        signals.append(self._analyze_pipeline_history(pipeline_stats))
 
         # Signal 4
-        signals.append(
-            self._analyze_critical_directories(
-                changes_data
-            )
-        )
+        signals.append(self._analyze_critical_directories(changes_data))
 
         # Signal 5
         signals.append(
@@ -109,23 +96,12 @@ class RiskEngine:
         )
 
         # Signal 6
-        signals.append(
-            self._analyze_time_risk(
-                pr_data
-            )
-        )
+        signals.append(self._analyze_time_risk(pr_data))
 
         # Signal 7
-        signals.append(
-            self._analyze_dependency_changes(
-                changes_data
-            )
-        )
+        signals.append(self._analyze_dependency_changes(changes_data))
 
-        total_risk = sum(
-            signal.score
-            for signal in signals
-        )
+        total_risk = sum(signal.score for signal in signals)
 
         if total_risk >= self.settings.high_risk_threshold:
             risk_level = "high"
@@ -136,18 +112,14 @@ class RiskEngine:
         else:
             risk_level = "low"
 
-        recommendations = (
-            self._generate_recommendations(
-                signals,
-                risk_level,
-            )
+        recommendations = self._generate_recommendations(
+            signals,
+            risk_level,
         )
 
         logger.info(
             "risk_analysis_completed",
-            pr_id=pr_data.get(
-                "pullRequestId"
-            ),
+            pr_id=pr_data.get("pullRequestId"),
             risk_score=total_risk,
             risk_level=risk_level,
         )
@@ -171,26 +143,14 @@ class RiskEngine:
         No synthetic "50 lines per file" estimate is used.
         """
 
-        change_entries = changes_data.get(
-            "changeEntries",
-            []
-        )
+        change_entries = changes_data.get("changeEntries", [])
 
-        diff_stats = (
-            changes_data.get(
-                "diffStats"
-            )
-            or {}
-        )
+        diff_stats = changes_data.get("diffStats") or {}
 
-        files_changed = diff_stats.get(
-            "files_changed"
-        )
+        files_changed = diff_stats.get("files_changed")
 
         if files_changed is None:
-            files_changed = len(
-                change_entries
-            )
+            files_changed = len(change_entries)
 
         diff_available = bool(
             diff_stats.get(
@@ -249,10 +209,7 @@ class RiskEngine:
                     f"{files_changed} files"
                 )
 
-            elif (
-                total_lines
-                > self.settings.max_lines_low_risk
-            ):
+            elif total_lines > self.settings.max_lines_low_risk:
 
                 score = 2.0
 
@@ -289,15 +246,10 @@ class RiskEngine:
             )
 
             if binary_files:
-                details += (
-                    f", Binary files: {binary_files}"
-                )
+                details += f", Binary files: {binary_files}"
 
             if unavailable_files:
-                details += (
-                    f", Unavailable files: "
-                    f"{unavailable_files}"
-                )
+                details += f", Unavailable files: " f"{unavailable_files}"
 
             return RiskSignal(
                 name="Commit Size Risk",
@@ -326,13 +278,8 @@ class RiskEngine:
         return RiskSignal(
             name="Commit Size Risk",
             score=score,
-            description=(
-                f"Line count unavailable: "
-                f"{files_changed} files changed"
-            ),
-            details=(
-                "Diff content could not be calculated"
-            ),
+            description=(f"Line count unavailable: " f"{files_changed} files changed"),
+            details=("Diff content could not be calculated"),
         )
 
     def _analyze_file_instability(
@@ -341,31 +288,18 @@ class RiskEngine:
         file_history: Dict[str, float],
     ) -> RiskSignal:
 
-        change_entries = changes_data.get(
-            "changeEntries",
-            []
-        )
+        change_entries = changes_data.get("changeEntries", [])
 
         unstable_files = []
         max_failure_rate = 0.0
 
         for entry in change_entries:
 
-            file_path = (
-                entry.get(
-                    "item",
-                    {}
-                ).get(
-                    "path",
-                    ""
-                )
-            )
+            file_path = entry.get("item", {}).get("path", "")
 
             if file_path in file_history:
 
-                failure_rate = (
-                    file_history[file_path]
-                )
+                failure_rate = file_history[file_path]
 
                 if failure_rate > 0.15:
 
@@ -386,35 +320,26 @@ class RiskEngine:
             score = 3.0
 
             description = (
-                f"{len(unstable_files)} "
-                "historically unstable files modified"
+                f"{len(unstable_files)} " "historically unstable files modified"
             )
 
         elif max_failure_rate > 0.15:
 
             score = 2.0
 
-            description = (
-                f"{len(unstable_files)} "
-                "files with elevated failure rates"
-            )
+            description = f"{len(unstable_files)} " "files with elevated failure rates"
 
         elif unstable_files:
 
             score = 1.0
 
-            description = (
-                f"{len(unstable_files)} "
-                "files with some failure history"
-            )
+            description = f"{len(unstable_files)} " "files with some failure history"
 
         else:
 
             score = 0.0
 
-            description = (
-                "No historically unstable files modified"
-            )
+            description = "No historically unstable files modified"
 
         details = None
 
@@ -426,13 +351,9 @@ class RiskEngine:
                 reverse=True,
             )[:3]
 
-            details = (
-                "Top unstable files: "
-                + ", ".join(
-                    f"{path.split('/')[-1]} "
-                    f"({rate * 100:.0f}%)"
-                    for path, rate in top_files
-                )
+            details = "Top unstable files: " + ", ".join(
+                f"{path.split('/')[-1]} " f"({rate * 100:.0f}%)"
+                for path, rate in top_files
             )
 
         return RiskSignal(
@@ -462,32 +383,24 @@ class RiskEngine:
             return RiskSignal(
                 name="Pipeline History Risk",
                 score=0.0,
-                description=(
-                    "No pipeline history available"
-                ),
+                description=("No pipeline history available"),
                 details="Insufficient data",
             )
 
-        failure_rate = (
-            failed_runs / total_runs
-        )
+        failure_rate = failed_runs / total_runs
 
         if failure_rate > 0.20:
 
             score = 2.0
 
-            description = (
-                f"High pipeline failure rate: "
-                f"{failure_rate * 100:.1f}%"
-            )
+            description = f"High pipeline failure rate: " f"{failure_rate * 100:.1f}%"
 
         elif failure_rate > 0.10:
 
             score = 1.5
 
             description = (
-                f"Elevated pipeline failure rate: "
-                f"{failure_rate * 100:.1f}%"
+                f"Elevated pipeline failure rate: " f"{failure_rate * 100:.1f}%"
             )
 
         elif failure_rate > 0.05:
@@ -495,27 +408,20 @@ class RiskEngine:
             score = 0.5
 
             description = (
-                f"Moderate pipeline failure rate: "
-                f"{failure_rate * 100:.1f}%"
+                f"Moderate pipeline failure rate: " f"{failure_rate * 100:.1f}%"
             )
 
         else:
 
             score = 0.0
 
-            description = (
-                f"Low pipeline failure rate: "
-                f"{failure_rate * 100:.1f}%"
-            )
+            description = f"Low pipeline failure rate: " f"{failure_rate * 100:.1f}%"
 
         return RiskSignal(
             name="Pipeline History Risk",
             score=score,
             description=description,
-            details=(
-                f"Recent runs: {total_runs}, "
-                f"Failed: {failed_runs}"
-            ),
+            details=(f"Recent runs: {total_runs}, " f"Failed: {failed_runs}"),
         )
 
     def _analyze_critical_directories(
@@ -536,24 +442,13 @@ class RiskEngine:
             "/api/",
         ]
 
-        change_entries = changes_data.get(
-            "changeEntries",
-            []
-        )
+        change_entries = changes_data.get("changeEntries", [])
 
         critical_files = []
 
         for entry in change_entries:
 
-            file_path = (
-                entry.get(
-                    "item",
-                    {}
-                ).get(
-                    "path",
-                    ""
-                ).lower()
-            )
+            file_path = entry.get("item", {}).get("path", "").lower()
 
             for critical_path in critical_paths:
 
@@ -572,43 +467,27 @@ class RiskEngine:
 
             score = 2.0
 
-            description = (
-                f"{len(critical_files)} "
-                "critical service files modified"
-            )
+            description = f"{len(critical_files)} " "critical service files modified"
 
         elif len(critical_files) >= 1:
 
             score = 1.5
 
-            description = (
-                f"{len(critical_files)} "
-                "critical service file(s) modified"
-            )
+            description = f"{len(critical_files)} " "critical service file(s) modified"
 
         else:
 
             score = 0.0
 
-            description = (
-                "No critical service areas affected"
-            )
+            description = "No critical service areas affected"
 
         details = None
 
         if critical_files:
 
-            affected_areas = set(
-                area.strip("/")
-                for _, area in critical_files
-            )
+            affected_areas = set(area.strip("/") for _, area in critical_files)
 
-            details = (
-                "Affected areas: "
-                + ", ".join(
-                    sorted(affected_areas)
-                )
-            )
+            details = "Affected areas: " + ", ".join(sorted(affected_areas))
 
         return RiskSignal(
             name="Critical Directory Risk",
@@ -623,22 +502,16 @@ class RiskEngine:
         file_history: Dict[str, float],
     ) -> RiskSignal:
 
-        created_by = pr_data.get(
-            "createdBy",
-            {}
-        )
+        created_by = pr_data.get("createdBy", {})
 
         author_name = created_by.get(
             "displayName",
             "Unknown",
         )
 
-        avg_failure_rate = (
-            sum(file_history.values())
-            / max(
-                len(file_history),
-                1,
-            )
+        avg_failure_rate = sum(file_history.values()) / max(
+            len(file_history),
+            1,
         )
 
         if avg_failure_rate > 0.3:
@@ -665,10 +538,7 @@ class RiskEngine:
 
             score = 0.0
 
-            description = (
-                "Author has good track record "
-                "on these files"
-            )
+            description = "Author has good track record " "on these files"
 
         return RiskSignal(
             name="Author Risk Profile",
@@ -682,18 +552,14 @@ class RiskEngine:
         pr_data: Dict,
     ) -> RiskSignal:
 
-        created_date = pr_data.get(
-            "creationDate"
-        )
+        created_date = pr_data.get("creationDate")
 
         if not created_date:
 
             return RiskSignal(
                 name="Time-of-Day Risk",
                 score=0.0,
-                description=(
-                    "PR creation time unavailable"
-                ),
+                description=("PR creation time unavailable"),
             )
 
         try:
@@ -714,37 +580,25 @@ class RiskEngine:
             if weekday >= 5:
 
                 score += 1.0
-                reasons.append(
-                    "weekend deployment"
-                )
+                reasons.append("weekend deployment")
 
             elif weekday == 4:
 
                 score += 0.5
-                reasons.append(
-                    "Friday deployment"
-                )
+                reasons.append("Friday deployment")
 
             if hour < 8 or hour > 18:
 
                 score += 0.5
-                reasons.append(
-                    "after-hours PR"
-                )
+                reasons.append("after-hours PR")
 
             if score > 0:
 
-                description = (
-                    "Elevated risk: "
-                    + ", ".join(reasons)
-                )
+                description = "Elevated risk: " + ", ".join(reasons)
 
             else:
 
-                description = (
-                    "PR created during "
-                    "safe deployment window"
-                )
+                description = "PR created during " "safe deployment window"
 
             day_name = [
                 "Monday",
@@ -756,10 +610,7 @@ class RiskEngine:
                 "Sunday",
             ][weekday]
 
-            details = (
-                f"Created: {day_name} "
-                f"at {hour:02d}:00"
-            )
+            details = f"Created: {day_name} " f"at {hour:02d}:00"
 
             return RiskSignal(
                 name="Time-of-Day Risk",
@@ -778,9 +629,7 @@ class RiskEngine:
             return RiskSignal(
                 name="Time-of-Day Risk",
                 score=0.0,
-                description=(
-                    "Could not analyze PR timing"
-                ),
+                description=("Could not analyze PR timing"),
             )
 
     def _analyze_dependency_changes(
@@ -801,36 +650,21 @@ class RiskEngine:
             "packages.config",
         ]
 
-        change_entries = changes_data.get(
-            "changeEntries",
-            []
-        )
+        change_entries = changes_data.get("changeEntries", [])
 
         modified_deps = []
 
         for entry in change_entries:
 
-            file_path = (
-                entry.get(
-                    "item",
-                    {}
-                ).get(
-                    "path",
-                    ""
-                ).lower()
-            )
+            file_path = entry.get("item", {}).get("path", "").lower()
 
-            file_name = (
-                file_path.split("/")[-1]
-            )
+            file_name = file_path.split("/")[-1]
 
             for dep_file in dependency_files:
 
                 if dep_file in file_name:
 
-                    modified_deps.append(
-                        file_path
-                    )
+                    modified_deps.append(file_path)
 
                     break
 
@@ -839,37 +673,27 @@ class RiskEngine:
             score = 2.0
 
             description = (
-                "Multiple dependency files "
-                f"modified ({len(modified_deps)} files)"
+                "Multiple dependency files " f"modified ({len(modified_deps)} files)"
             )
 
         elif len(modified_deps) == 1:
 
             score = 1.5
 
-            description = (
-                "Dependency file modified - "
-                "version conflicts possible"
-            )
+            description = "Dependency file modified - " "version conflicts possible"
 
         else:
 
             score = 0.0
 
-            description = (
-                "No dependency file changes"
-            )
+            description = "No dependency file changes"
 
         details = None
 
         if modified_deps:
 
-            details = (
-                "Modified: "
-                + ", ".join(
-                    path.split("/")[-1]
-                    for path in modified_deps
-                )
+            details = "Modified: " + ", ".join(
+                path.split("/")[-1] for path in modified_deps
             )
 
         return RiskSignal(
@@ -890,83 +714,53 @@ class RiskEngine:
         if risk_level == "high":
 
             recommendations.append(
-                "⚠️ High risk detected - "
-                "Require senior engineer review"
+                "⚠️ High risk detected - " "Require senior engineer review"
             )
 
-            recommendations.append(
-                "Consider breaking this PR "
-                "into smaller changes"
-            )
+            recommendations.append("Consider breaking this PR " "into smaller changes")
 
         for signal in signals:
 
-            if (
-                signal.name == "Commit Size Risk"
-                and signal.score >= 2.0
-            ):
+            if signal.name == "Commit Size Risk" and signal.score >= 2.0:
 
                 recommendations.append(
-                    "Large changeset - Review "
-                    "carefully for logic errors"
+                    "Large changeset - Review " "carefully for logic errors"
                 )
 
-            if (
-                signal.name == "File Instability Risk"
-                and signal.score >= 2.0
-            ):
+            if signal.name == "File Instability Risk" and signal.score >= 2.0:
 
                 recommendations.append(
-                    "Modified files have failure "
-                    "history - Add extra tests"
+                    "Modified files have failure " "history - Add extra tests"
                 )
 
-            if (
-                signal.name == "Pipeline History Risk"
-                and signal.score >= 1.5
-            ):
+            if signal.name == "Pipeline History Risk" and signal.score >= 1.5:
 
                 recommendations.append(
-                    "Pipeline has been unstable - "
-                    "Monitor deployment closely"
+                    "Pipeline has been unstable - " "Monitor deployment closely"
                 )
 
-            if (
-                signal.name == "Critical Directory Risk"
-                and signal.score >= 1.5
-            ):
+            if signal.name == "Critical Directory Risk" and signal.score >= 1.5:
 
                 recommendations.append(
-                    "Critical services affected - "
-                    "Ensure rollback plan is ready"
+                    "Critical services affected - " "Ensure rollback plan is ready"
                 )
 
-            if (
-                signal.name == "Dependency Change Risk"
-                and signal.score >= 1.5
-            ):
+            if signal.name == "Dependency Change Risk" and signal.score >= 1.5:
 
                 recommendations.append(
                     "Dependency changes detected - "
                     "Test thoroughly across environments"
                 )
 
-            if (
-                signal.name == "Time-of-Day Risk"
-                and signal.score >= 1.0
-            ):
+            if signal.name == "Time-of-Day Risk" and signal.score >= 1.0:
 
                 recommendations.append(
-                    "Off-hours deployment - "
-                    "Ensure on-call support is available"
+                    "Off-hours deployment - " "Ensure on-call support is available"
                 )
 
         if not recommendations:
 
-            recommendations.append(
-                "✅ Low risk - Standard review "
-                "process applies"
-            )
+            recommendations.append("✅ Low risk - Standard review " "process applies")
 
         return recommendations
 
@@ -983,18 +777,9 @@ class RiskEngine:
         }[result.risk_level]
 
         gate_status = {
-            "high": (
-                "⛔ Release Gate: BLOCK "
-                "(manual approval required)"
-            ),
-            "medium": (
-                "⚠️ Release Gate: REVIEW "
-                "(senior reviewer recommended)"
-            ),
-            "low": (
-                "✅ Release Gate: PASS "
-                "(standard workflow)"
-            ),
+            "high": ("⛔ Release Gate: BLOCK " "(manual approval required)"),
+            "medium": ("⚠️ Release Gate: REVIEW " "(senior reviewer recommended)"),
+            "low": ("✅ Release Gate: PASS " "(standard workflow)"),
         }[result.risk_level]
 
         dominant_signals = sorted(
@@ -1004,17 +789,11 @@ class RiskEngine:
         )[:2]
 
         dominant_text = ", ".join(
-            f"{signal.name} "
-            f"({signal.score:.1f})"
-            for signal in dominant_signals
+            f"{signal.name} " f"({signal.score:.1f})" for signal in dominant_signals
         )
 
         commit_signal = next(
-            (
-                signal
-                for signal in result.signals
-                if signal.name == "Commit Size Risk"
-            ),
+            (signal for signal in result.signals if signal.name == "Commit Size Risk"),
             None,
         )
 
@@ -1022,8 +801,7 @@ class RiskEngine:
             (
                 signal
                 for signal in result.signals
-                if signal.name
-                == "Pipeline History Risk"
+                if signal.name == "Pipeline History Risk"
             ),
             None,
         )
@@ -1032,48 +810,30 @@ class RiskEngine:
             (
                 signal
                 for signal in result.signals
-                if signal.name
-                == "Critical Directory Risk"
+                if signal.name == "Critical Directory Risk"
             ),
             None,
         )
 
-        changed_files = (
-            self._extract_files_changed(
-                commit_signal.description
-                if commit_signal
-                else ""
-            )
+        changed_files = self._extract_files_changed(
+            commit_signal.description if commit_signal else ""
         )
 
-        changed_lines = (
-            self._extract_lines_changed(
-                commit_signal.description
-                if commit_signal
-                else ""
-            )
+        changed_lines = self._extract_lines_changed(
+            commit_signal.description if commit_signal else ""
         )
 
-        pipeline_failure = (
-            self._extract_percentage(
-                pipeline_signal.description
-                if pipeline_signal
-                else ""
-            )
+        pipeline_failure = self._extract_percentage(
+            pipeline_signal.description if pipeline_signal else ""
         )
 
         impacted_areas = (
             critical_signal.details
-            if critical_signal
-            and critical_signal.details
+            if critical_signal and critical_signal.details
             else "Affected areas: none"
         )
 
-        required_checks = (
-            self._build_required_checks(
-                result
-            )
-        )
+        required_checks = self._build_required_checks(result)
 
         comment = f"""## {emoji} DeployGuard Risk Report
 
@@ -1101,51 +861,31 @@ class RiskEngine:
 
         for signal in result.signals:
 
-            comment += (
-                f"\n**{signal.name}** "
-                f"({signal.score:.1f} points)\n"
-            )
+            comment += f"\n**{signal.name}** " f"({signal.score:.1f} points)\n"
 
-            comment += (
-                f"• {signal.description}\n"
-            )
+            comment += f"• {signal.description}\n"
 
             if signal.details:
 
-                comment += (
-                    f"  _{signal.details}_\n"
-                )
+                comment += f"  _{signal.details}_\n"
 
         comment += "\n### Recommendations\n"
 
-        for recommendation in (
-            result.recommendations
-        ):
+        for recommendation in result.recommendations:
 
-            comment += (
-                f"• {recommendation}\n"
-            )
+            comment += f"• {recommendation}\n"
 
-        comment += (
-            "\n### Required Checks Before Merge\n"
-        )
+        comment += "\n### Required Checks Before Merge\n"
 
         for check in required_checks:
 
-            comment += (
-                f"• {check}\n"
-            )
+            comment += f"• {check}\n"
 
         comment += "\n### Audit Metadata\n"
 
-        comment += (
-            "• Model version: `risk-engine-v1`\n"
-        )
+        comment += "• Model version: `risk-engine-v1`\n"
 
-        comment += (
-            f"• Signal count: "
-            f"`{len(result.signals)}`\n"
-        )
+        comment += f"• Signal count: " f"`{len(result.signals)}`\n"
 
         comment += (
             "• Generated by policy thresholds: "
@@ -1154,9 +894,7 @@ class RiskEngine:
         )
 
         comment += (
-            "\n---\n"
-            "_Powered by "
-            "[DeployGuard](https://github.com/zatharox)_"
+            "\n---\n" "_Powered by " "[DeployGuard](https://github.com/zatharox)_"
         )
 
         return comment
@@ -1171,11 +909,7 @@ class RiskEngine:
             text,
         )
 
-        return (
-            match.group(1)
-            if match
-            else "N/A"
-        )
+        return match.group(1) if match else "N/A"
 
     def _extract_lines_changed(
         self,
@@ -1191,11 +925,7 @@ class RiskEngine:
             text,
         )
 
-        return (
-            match.group(1)
-            if match
-            else "N/A"
-        )
+        return match.group(1) if match else "N/A"
 
     def _extract_percentage(
         self,
@@ -1207,11 +937,7 @@ class RiskEngine:
             text,
         )
 
-        return (
-            f"{match.group(1)}%"
-            if match
-            else "N/A"
-        )
+        return f"{match.group(1)}%" if match else "N/A"
 
     def _build_required_checks(
         self,
@@ -1225,33 +951,19 @@ class RiskEngine:
 
         for signal in result.signals:
 
-            if (
-                signal.name
-                == "Critical Directory Risk"
-                and signal.score >= 1.5
-            ):
+            if signal.name == "Critical Directory Risk" and signal.score >= 1.5:
 
                 checks.append(
-                    "Attach rollback strategy for "
-                    "impacted critical services"
+                    "Attach rollback strategy for " "impacted critical services"
                 )
 
-            if (
-                signal.name
-                == "File Instability Risk"
-                and signal.score >= 2.0
-            ):
+            if signal.name == "File Instability Risk" and signal.score >= 2.0:
 
                 checks.append(
-                    "Add/attach targeted regression "
-                    "tests for unstable files"
+                    "Add/attach targeted regression " "tests for unstable files"
                 )
 
-            if (
-                signal.name
-                == "Pipeline History Risk"
-                and signal.score >= 1.5
-            ):
+            if signal.name == "Pipeline History Risk" and signal.score >= 1.5:
 
                 checks.append(
                     "Monitor post-merge pipeline and "
@@ -1260,10 +972,7 @@ class RiskEngine:
 
         if result.risk_level == "high":
 
-            checks.append(
-                "Require senior engineer or "
-                "release manager approval"
-            )
+            checks.append("Require senior engineer or " "release manager approval")
 
         # Preserve order and remove duplicates.
         seen = set()

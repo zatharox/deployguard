@@ -8,7 +8,9 @@ from db.models import Tenant
 
 def get_or_create_default_tenant(db: Session) -> Tenant:
     settings = get_settings()
-    tenant = db.query(Tenant).filter(Tenant.slug == settings.default_tenant_slug).first()
+    tenant = (
+        db.query(Tenant).filter(Tenant.slug == settings.default_tenant_slug).first()
+    )
     if tenant:
         return tenant
 

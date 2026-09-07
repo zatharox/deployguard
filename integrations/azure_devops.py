@@ -8,7 +8,6 @@ import structlog
 
 from config import get_settings
 
-
 logger = structlog.get_logger()
 
 
@@ -17,9 +16,7 @@ class AzureDevOpsClient:
 
     def __init__(self):
         self.settings = get_settings()
-        self.base_url = (
-            f"https://dev.azure.com/{self.settings.azure_devops_org}"
-        )
+        self.base_url = f"https://dev.azure.com/{self.settings.azure_devops_org}"
         self.headers = {
             "Content-Type": "application/json",
             "Authorization": f"Basic {self._get_encoded_pat()}",
@@ -311,9 +308,7 @@ class AzureDevOpsClient:
             for entry in file_entries:
                 item = entry.get("item", {})
 
-                change_type = (
-                    entry.get("changeType") or ""
-                ).lower()
+                change_type = (entry.get("changeType") or "").lower()
 
                 current_blob = item.get("objectId")
                 original_blob = item.get("originalObjectId")
@@ -345,9 +340,7 @@ class AzureDevOpsClient:
 
                 return entry, old_content, new_content
 
-            results = await asyncio.gather(
-                *(fetch_pair(pair) for pair in blob_pairs)
-            )
+            results = await asyncio.gather(*(fetch_pair(pair) for pair in blob_pairs))
 
             # ---------------------------------------------------------
             # 7. Calculate actual additions/deletions.
@@ -359,9 +352,7 @@ class AzureDevOpsClient:
 
             for entry, old_content, new_content in results:
 
-                change_type = (
-                    entry.get("changeType") or ""
-                ).lower()
+                change_type = (entry.get("changeType") or "").lower()
 
                 # New file.
                 if change_type == "add":
