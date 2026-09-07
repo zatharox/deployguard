@@ -22,7 +22,12 @@ class RateLimiter:
     def _get_client_id(self, request: Request) -> str:
         """Get client identifier (IP + user if authenticated)"""
         forwarded_for = request.headers.get("X-Forwarded-For")
-        client_ip = forwarded_for.split(",")[0] if forwarded_for else request.client.host
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+        elif request.client:
+            client_ip = request.client.host
+        else:
+            client_ip = "unknown"
         
         # Include user ID if authenticated
         user_id = getattr(request.state, "user_id", None)

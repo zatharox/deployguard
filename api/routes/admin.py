@@ -10,8 +10,7 @@ import structlog
 
 from db.database import get_db
 from db.models import User, Tenant, PRAnalysis, UsageEvent, Membership
-from services.auth_service import get_current_user, check_role
-from db.schemas import TenantResponse
+from services.auth_service import get_current_user, require_roles
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -20,7 +19,7 @@ logger = structlog.get_logger()
 @router.get("/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(
     current_user: User = Depends(get_current_user),
-    _role_check = Depends(check_role(["owner", "admin"]))
+    _role_check = Depends(require_roles(["owner", "admin"]))
 ):
     """
     Admin dashboard for managing tenants, users, and system metrics
@@ -284,7 +283,7 @@ async def admin_dashboard(
 async def get_system_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _role_check = Depends(check_role(["owner", "admin"]))
+    _role_check = Depends(require_roles(["owner", "admin"]))
 ):
     """Get system-wide statistics"""
     

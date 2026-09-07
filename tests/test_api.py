@@ -43,7 +43,19 @@ def test_root_endpoint():
 
 def test_get_summary_stats():
     """Test summary statistics endpoint"""
-    response = client.get("/api/v1/analysis/stats/summary")
+    auth_response = client.post("/api/v1/auth/demo-bootstrap")
+    assert auth_response.status_code == 200
+
+    auth = auth_response.json()
+
+    response = client.get(
+        "/api/v1/analysis/stats/summary",
+        headers={
+            "Authorization": f"Bearer {auth['access_token']}",
+            "X-Tenant-Slug": auth["tenant"],
+        },
+    )
+
     assert response.status_code == 200
     assert "total_analyses" in response.json()
 
