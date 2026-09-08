@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from config import get_settings
 from api.routes import webhook, analysis, health, enterprise, auth
 from api.routes import azure_connectivity, admin
-from db.database import engine, Base , ensure_schema
+from db.database import engine, Base, ensure_schema
 from services.logging_utils import bind_log_context, clear_log_context, get_request_id
 from services.cache_service import cache_service
 from services.rate_limiter import rate_limit_middleware
@@ -49,7 +49,6 @@ async def lifespan(app: FastAPI):
     await cache_service.close()
 
     logger.info("shutting_down_deployguard")
-
 
 
 # Initialize FastAPI app with enhanced styling
@@ -1005,7 +1004,6 @@ async def landing_page():
     </body>
     </html>
     """
-
 
 
 if __name__ == "__main__":

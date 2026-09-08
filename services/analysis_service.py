@@ -91,9 +91,7 @@ class AnalysisService:
             for entry in changes_data.get("changeEntries", [])
         ]
 
-        change_graph = self.change_graph_analyzer.analyze(
-            changed_files
-        )
+        change_graph = self.change_graph_analyzer.analyze(changed_files)
 
         changes_data["changeGraph"] = change_graph.to_dict()
 

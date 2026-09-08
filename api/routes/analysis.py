@@ -243,15 +243,15 @@ async def run_demo_scenario(
     }
 
     changes_data = {
-    "changeEntries": [
-        {
-            "item": {
-                "path": p,
+        "changeEntries": [
+            {
+                "item": {
+                    "path": p,
+                }
             }
-        }
-        for p in files
-    ]
-}
+            for p in files
+        ]
+    }
 
     # Generate structural change intelligence for the demo scenario.
     change_graph = change_graph_analyzer.analyze(files)
@@ -294,9 +294,7 @@ async def run_demo_scenario(
         signals=json.dumps([s.__dict__ for s in result.signals]),
         recommendations=json.dumps(result.recommendations),
         change_graph=(
-            json.dumps(result.change_graph)
-            if result.change_graph is not None
-            else None
+            json.dumps(result.change_graph) if result.change_graph is not None else None
         ),
         pr_title=pr_data["title"],
         pr_author=pr_data["createdBy"]["displayName"],

@@ -65,9 +65,7 @@ async def handle_azure_devops_webhook(
 
             existing_event = (
                 db.query(WebhookEvent)
-                .filter(
-                    WebhookEvent.notification_id == notification_id
-                )
+                .filter(WebhookEvent.notification_id == notification_id)
                 .first()
             )
 
@@ -146,8 +144,7 @@ async def handle_azure_devops_webhook(
         raise HTTPException(
             status_code=404,
             detail=(
-                f"Repository '{repository_id}' is not registered "
-                "with DeployGuard"
+                f"Repository '{repository_id}' is not registered " "with DeployGuard"
             ),
         )
 
@@ -185,9 +182,7 @@ async def handle_azure_devops_webhook(
 
         existing_event = (
             db.query(WebhookEvent)
-            .filter(
-                WebhookEvent.notification_id == notification_id
-            )
+            .filter(WebhookEvent.notification_id == notification_id)
             .first()
         )
 

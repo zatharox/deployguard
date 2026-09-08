@@ -7,9 +7,7 @@ from config import get_settings
 settings = get_settings()
 
 connect_args = (
-    {"check_same_thread": False}
-    if settings.database_url.startswith("sqlite")
-    else {}
+    {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
 )
 
 engine = create_engine(
@@ -40,18 +38,12 @@ def ensure_schema():
     if "pr_analysis" not in inspector.get_table_names():
         return
 
-    columns = {
-        column["name"]
-        for column in inspector.get_columns("pr_analysis")
-    }
+    columns = {column["name"] for column in inspector.get_columns("pr_analysis")}
 
     if "change_graph" not in columns:
         with engine.begin() as connection:
             connection.execute(
-                text(
-                    "ALTER TABLE pr_analysis "
-                    "ADD COLUMN change_graph TEXT"
-                )
+                text("ALTER TABLE pr_analysis " "ADD COLUMN change_graph TEXT")
             )
 
 
