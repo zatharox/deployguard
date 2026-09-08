@@ -53,3 +53,7 @@ htmlcov/
 # Alembic
 alembic/versions/*.pyc
 deployguard.db
+
+.env
+.env.*
+!.env.example

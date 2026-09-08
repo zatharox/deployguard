@@ -1,6 +1,8 @@
-from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Optional
+import json
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class RiskSignalSchema(BaseModel):
@@ -24,22 +26,38 @@ class RiskAnalysisResponse(BaseModel):
 class PRAnalysisSchema(BaseModel):
     """PR analysis database schema"""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     pr_id: int
     repository_id: str
     risk_score: float
     risk_level: str
-    pr_title: Optional[str]
-    pr_author: Optional[str]
-    files_changed: Optional[int]
+    pr_title: Optional[str] = None
+    pr_author: Optional[str] = None
+    files_changed: Optional[int] = None
     analyzed_at: datetime
+    change_graph: Optional[Dict[str, Any]] = None
 
-    class Config:
-        from_attributes = True
+    @field_validator("change_graph", mode="before")
+    @classmethod
+    def parse_change_graph(cls, value):
+        if value is None or value == "":
+            return None
+
+        if isinstance(value, str):
+            return json.loads(value)
+
+        if isinstance(value, dict):
+            return value
+
+        raise ValueError("Invalid change_graph format")
 
 
 class FileHistorySchema(BaseModel):
     """File history schema"""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     file_path: str
@@ -47,9 +65,6 @@ class FileHistorySchema(BaseModel):
     failure_count: int
     failure_rate: float
     last_modified: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class WebhookPayload(BaseModel):
@@ -61,5 +76,4 @@ class WebhookPayload(BaseModel):
     eventType: str
     resource: dict
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
