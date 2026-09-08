@@ -4,11 +4,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import structlog
+from contextlib import asynccontextmanager
 
 from config import get_settings
 from api.routes import webhook, analysis, health, enterprise, auth
 from api.routes import azure_connectivity, admin
-from db.database import engine, Base
+from db.database import engine, Base , ensure_schema
 from services.logging_utils import bind_log_context, clear_log_context, get_request_id
 from services.cache_service import cache_service
 from services.rate_limiter import rate_limit_middleware
@@ -26,10 +27,35 @@ logger = structlog.get_logger()
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+ensure_schema()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    settings = get_settings()
+
+    await cache_service.connect()
+
+    logger.info(
+        "starting_deployguard",
+        org=settings.azure_devops_org,
+        project=settings.azure_devops_project,
+    )
+
+    yield
+
+    # Shutdown
+    await cache_service.close()
+
+    logger.info("shutting_down_deployguard")
+
+
 
 # Initialize FastAPI app with enhanced styling
 app = FastAPI(
     title="🛡️ DeployGuard",
+    lifespan=lifespan,
     description="""
     ## Azure DevOps Deployment Risk Predictor
     
@@ -980,22 +1006,6 @@ async def landing_page():
     </html>
     """
 
-
-@app.on_event("startup")
-async def startup_event():
-    settings = get_settings()
-    await cache_service.connect()
-    logger.info(
-        "starting_deployguard",
-        org=settings.azure_devops_org,
-        project=settings.azure_devops_project,
-    )
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    await cache_service.close()
-    logger.info("shutting_down_deployguard")
 
 
 if __name__ == "__main__":

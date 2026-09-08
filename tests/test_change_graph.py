@@ -61,6 +61,7 @@ def test_critical_areas_are_detected():
     }
 
     assert result.blast_radius_level == "broad"
+    assert result.blast_radius_score >= 7.0
 
 
 def test_duplicate_paths_are_removed():
@@ -89,6 +90,7 @@ def test_empty_changes_are_safe():
     assert result.critical_areas == []
     assert result.blast_radius_score == 0.0
     assert result.blast_radius_level == "narrow"
+    assert result.confidence == "low"
 
 
 def test_graph_contains_expected_relationships():
@@ -100,9 +102,7 @@ def test_graph_contains_expected_relationships():
         ]
     )
 
-    relationships = {
-        edge.relationship
-        for edge in result.edges
-    }
+    relationships = {edge.relationship for edge in result.edges}
+
     assert "belongs_to" in relationships
     assert "affects" in relationships

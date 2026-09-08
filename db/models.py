@@ -155,6 +155,7 @@ class PRAnalysis(Base):
     pr_author = Column(String(100))
     files_changed = Column(Integer)
     lines_changed = Column(Integer)
+    change_graph = Column(Text)  # JSON string of change graph result
 
     __table_args__ = (
         Index("idx_pr_repo", "pr_id", "repository_id"),
@@ -188,19 +189,29 @@ class PipelineHistory(Base):
         Index("idx_tenant_pipeline", "tenant_id", "pipeline_id"),
     )
 
-
 class WebhookEvent(Base):
-    """Log incoming webhook events for debugging"""
-
     __tablename__ = "webhook_events"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)
+
+    tenant_id = Column(
+        Integer,
+        ForeignKey("tenants.id"),
+        nullable=True,
+        index=True,
+    )
+
+    notification_id = Column(
+        Integer,
+        nullable=True,
+        index=True,
+    )
+
     event_type = Column(String(100), nullable=False, index=True)
     repository_id = Column(String(100))
     pr_id = Column(Integer)
-    payload = Column(Text)  # Full JSON payload
-    processed = Column(Integer, default=0)  # 0=pending, 1=processed, -1=error
+    payload = Column(Text)
+    processed = Column(Integer, default=0)
     error_message = Column(Text)
     received_at = Column(DateTime(timezone=True), server_default=func.now())
     processed_at = Column(DateTime(timezone=True))

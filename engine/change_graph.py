@@ -68,9 +68,9 @@ class ChangeGraphAnalyzer:
     """
     Analyze changed files to estimate structural blast radius.
 
-    This first implementation is deterministic:
-    - Files are mapped to top-level components.
-    - Files are mapped to known critical areas.
+    This implementation is deterministic:
+    - Files are mapped to components.
+    - Files are mapped to critical areas.
     - A bounded structural blast-radius score is calculated.
     """
 
@@ -91,12 +91,6 @@ class ChangeGraphAnalyzer:
     def analyze(self, changed_files: List[str]) -> ChangeGraphResult:
         """
         Analyze a list of changed file paths.
-
-        Args:
-            changed_files: File paths changed by a PR.
-
-        Returns:
-            ChangeGraphResult containing graph and blast-radius information.
         """
 
         normalized_files = self._normalize_files(changed_files)
@@ -108,24 +102,31 @@ class ChangeGraphAnalyzer:
         component_map: Dict[str, Set[str]] = {}
         critical_map: Dict[str, Set[str]] = {}
 
+        existing_node_ids: Set[str] = set()
+
         for file_path in normalized_files:
             component = self._extract_component(file_path)
 
-            component_map.setdefault(component, set()).add(file_path)
+            component_map.setdefault(
+                component,
+                set(),
+            ).add(file_path)
 
-            node_id = f"file:{file_path}"
+            file_node_id = f"file:{file_path}"
 
-            result.nodes.append(
-                ChangeNode(
-                    node_id=node_id,
-                    node_type="file",
-                    name=file_path,
+            if file_node_id not in existing_node_ids:
+                result.nodes.append(
+                    ChangeNode(
+                        node_id=file_node_id,
+                        node_type="file",
+                        name=file_path,
+                    )
                 )
-            )
+                existing_node_ids.add(file_node_id)
 
             component_node_id = f"component:{component}"
 
-            if component_node_id not in {node.node_id for node in result.nodes}:
+            if component_node_id not in existing_node_ids:
                 result.nodes.append(
                     ChangeNode(
                         node_id=component_node_id,
@@ -133,10 +134,11 @@ class ChangeGraphAnalyzer:
                         name=component,
                     )
                 )
+                existing_node_ids.add(component_node_id)
 
             result.edges.append(
                 ChangeEdge(
-                    source=node_id,
+                    source=file_node_id,
                     target=component_node_id,
                     relationship="belongs_to",
                 )
@@ -152,7 +154,7 @@ class ChangeGraphAnalyzer:
 
                 critical_node_id = f"critical:{critical_area}"
 
-                if critical_node_id not in {node.node_id for node in result.nodes}:
+                if critical_node_id not in existing_node_ids:
                     result.nodes.append(
                         ChangeNode(
                             node_id=critical_node_id,
@@ -160,17 +162,17 @@ class ChangeGraphAnalyzer:
                             name=critical_area,
                         )
                     )
+                    existing_node_ids.add(critical_node_id)
 
                 result.edges.append(
                     ChangeEdge(
-                        source=node_id,
+                        source=file_node_id,
                         target=critical_node_id,
                         relationship="affects",
                     )
                 )
 
         components = sorted(component_map.keys())
-
         critical_areas = sorted(critical_map.keys())
 
         result.components = components
@@ -222,12 +224,12 @@ class ChangeGraphAnalyzer:
     @staticmethod
     def _extract_component(file_path: str) -> str:
         """
-        Infer a component from the first meaningful path segment.
+        Infer a component from the path.
 
         Examples:
             api/auth.py -> api
             services/user.py -> services
-            src/payment/service.py -> src
+            src/payment/service.py -> payment
             payment/service.py -> payment
         """
 
@@ -297,7 +299,6 @@ class ChangeGraphAnalyzer:
             score += 0.5
 
         # Cross-component impact: maximum 3 points.
-        # Cross-component impact: maximum 3 points.
         if components_changed >= 5:
             score += 3.0
         elif components_changed >= 3:
@@ -313,7 +314,8 @@ class ChangeGraphAnalyzer:
         elif critical_areas_changed == 1:
             score += 2.0
 
-        # Multiple critical areas indicate cross-domain impact.
+        # Multiple critical domains across multiple components
+        # represent a broad structural blast radius.
         if critical_areas_changed >= 3 and components_changed >= 3:
             score = max(score, 7.0)
 
@@ -334,7 +336,7 @@ class ChangeGraphAnalyzer:
         components_changed: int,
     ) -> str:
         """
-        Estimate confidence based on available structural information.
+        Estimate confidence based on structural information.
         """
 
         if files_changed >= 5 and components_changed >= 2:

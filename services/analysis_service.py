@@ -5,6 +5,7 @@ import json
 import structlog
 
 from db.models import PRAnalysis, FileHistory, PipelineHistory
+from engine.change_graph import ChangeGraphAnalyzer
 from engine.risk_analyzer import RiskEngine, RiskAnalysisResult
 from integrations.azure_devops import AzureDevOpsClient
 from integrations.mock_azure_devops import MockAzureDevOpsClient
@@ -31,6 +32,7 @@ class AnalysisService:
         )
 
         self.risk_engine = RiskEngine()
+        self.change_graph_analyzer = ChangeGraphAnalyzer()
 
     async def analyze_pr(
         self,
@@ -81,6 +83,19 @@ class AnalysisService:
         )
 
         changes_data["diffStats"] = diff_stats
+        # ---------------------------------------------------------
+        # 3a. Structural change graph / blast radius.
+        # ---------------------------------------------------------
+        changed_files = [
+            entry.get("item", {}).get("path", "")
+            for entry in changes_data.get("changeEntries", [])
+        ]
+
+        change_graph = self.change_graph_analyzer.analyze(
+            changed_files
+        )
+
+        changes_data["changeGraph"] = change_graph.to_dict()
 
         # ---------------------------------------------------------
         # 4. Historical file risk.
@@ -277,6 +292,11 @@ class AnalysisService:
             risk_level=result.risk_level,
             signals=json.dumps([s.__dict__ for s in result.signals]),
             recommendations=json.dumps(result.recommendations),
+            change_graph=(
+                json.dumps(result.change_graph)
+                if result.change_graph is not None
+                else None
+            ),
             pr_title=pr_data.get("title"),
             pr_author=(pr_data.get("createdBy", {}).get("displayName")),
             files_changed=files_changed,

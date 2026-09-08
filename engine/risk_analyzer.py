@@ -29,6 +29,7 @@ class RiskAnalysisResult:
     signals: List[RiskSignal]
     recommendations: List[str]
     analysis_id: Optional[int] = None
+    change_graph: Optional[Dict] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -51,6 +52,7 @@ class RiskAnalysisResult:
                 for signal in self.signals
             ],
             "recommendations": self.recommendations,
+            "change_graph": self.change_graph,
         }
 
 
@@ -101,7 +103,16 @@ class RiskEngine:
         # Signal 7
         signals.append(self._analyze_dependency_changes(changes_data))
 
-        total_risk = sum(signal.score for signal in signals)
+        # Signal 8
+        signals.append(
+            self._analyze_blast_radius(
+                changes_data,
+            )
+        )
+
+        raw_risk = sum(signal.score for signal in signals)
+
+        total_risk= min (raw_risk,10.0,)
 
         if total_risk >= self.settings.high_risk_threshold:
             risk_level = "high"
@@ -129,7 +140,84 @@ class RiskEngine:
             risk_level=risk_level,
             signals=signals,
             recommendations=recommendations,
+            change_graph=changes_data.get("changeGraph"),
         )
+
+    
+    def _analyze_blast_radius(
+    self,
+    changes_data: Dict,
+    ) -> RiskSignal:
+            """
+            Signal 8: Structural blast radius.
+
+            The ChangeGraphAnalyzer produces a 0-10 structural score.
+            This signal converts that score to a maximum 2-point
+            contribution to the overall risk score.
+            """
+
+            change_graph = changes_data.get("changeGraph") or {}
+
+            blast_radius = change_graph.get("blast_radius") or {}
+
+            structural_score = float(
+                blast_radius.get("score", 0.0)
+            )
+
+            level = blast_radius.get(
+                "level",
+                "narrow",
+            )
+
+            confidence = blast_radius.get(
+                "confidence",
+                "low",
+            )
+
+            contribution = min(
+                structural_score / 5.0,
+                2.0,
+            )
+
+            changed_files = change_graph.get(
+                "changed_files",
+                [],
+            )
+
+            components = change_graph.get(
+                "components",
+                [],
+            )
+
+            critical_areas = change_graph.get(
+                "critical_areas",
+                [],
+            )
+
+            description = (
+                f"{level.capitalize()} structural blast radius: "
+                f"{len(changed_files)} files across "
+                f"{len(components)} components"
+            )
+
+            details = (
+                f"Structural score: {structural_score:.1f}/10, "
+                f"confidence: {confidence}"
+            )
+
+            if critical_areas:
+                details += (
+                    ", critical areas: "
+                    + ", ".join(critical_areas)
+                )
+
+            return RiskSignal(
+                name="Blast Radius Risk",
+                score=round(contribution, 2),
+                description=description,
+                details=details,
+            )
+
 
     def _analyze_commit_size(
         self,

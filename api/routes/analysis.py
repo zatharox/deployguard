@@ -14,6 +14,7 @@ from services.auth_service import require_api_key, require_roles
 from services.metering_service import record_usage_event
 from services.plan_service import enforce_analysis_quota
 from engine.risk_analyzer import RiskEngine
+from engine.change_graph import ChangeGraphAnalyzer
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -50,6 +51,7 @@ async def run_demo_scenario(
     logger.info(
         "analysis_demo_started", tenant_slug=tenant.slug, scenario=scenario, reset=reset
     )
+    change_graph_analyzer = ChangeGraphAnalyzer()
     enforce_analysis_quota(db, tenant)
     scenario = scenario.lower().strip()
     if scenario not in {"low", "medium", "high", "critical"}:
@@ -239,15 +241,48 @@ async def run_demo_scenario(
         "title": f"Demo {scenario.capitalize()} Risk PR",
         "createdBy": {"displayName": "Demo User"},
     }
-    changes_data = {"changeEntries": [{"item": {"path": p}} for p in files]}
+
+    changes_data = {
+    "changeEntries": [
+        {
+            "item": {
+                "path": p,
+            }
+        }
+        for p in files
+    ]
+}
+
+    # Generate structural change intelligence for the demo scenario.
+    change_graph = change_graph_analyzer.analyze(files)
+
+    changes_data["changeGraph"] = change_graph.to_dict()
+
+    logger.info(
+        "demo_change_graph_analysis_completed",
+        scenario=scenario,
+        files_changed=len(change_graph.changed_files),
+        components_changed=len(change_graph.components),
+        critical_areas=len(change_graph.critical_areas),
+        blast_radius_score=change_graph.blast_radius_score,
+        blast_radius_level=change_graph.blast_radius_level,
+        confidence=change_graph.confidence,
+    )
 
     risk_engine = RiskEngine()
-    analysis_service = AnalysisService(db, tenant_id=tenant.id)
+    analysis_service = AnalysisService(
+        db,
+        tenant_id=tenant.id,
+    )
+
     result = await risk_engine.analyze_pr(
         pr_data=pr_data,
         changes_data=changes_data,
         file_history=analysis_service._get_file_history_dict(),
-        pipeline_stats={"total_runs": total_runs, "failed_runs": failures},
+        pipeline_stats={
+            "total_runs": total_runs,
+            "failed_runs": failures,
+        },
     )
 
     record = PRAnalysis(
@@ -258,6 +293,11 @@ async def run_demo_scenario(
         risk_level=result.risk_level,
         signals=json.dumps([s.__dict__ for s in result.signals]),
         recommendations=json.dumps(result.recommendations),
+        change_graph=(
+            json.dumps(result.change_graph)
+            if result.change_graph is not None
+            else None
+        ),
         pr_title=pr_data["title"],
         pr_author=pr_data["createdBy"]["displayName"],
         files_changed=len(files),

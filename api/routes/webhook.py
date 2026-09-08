@@ -1,25 +1,31 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 import json
 import structlog
 
 from db.database import get_db
-from db.models import WebhookEvent
+from db.models import WebhookEvent, Repository
 from db.schemas import WebhookPayload
-from services.analysis_service import AnalysisService
+from services.tasks import analyze_pr_task
 
 router = APIRouter()
 logger = structlog.get_logger()
 
 
+SUPPORTED_EVENTS = {
+    "git.pullrequest.created",
+    "git.pullrequest.updated",
+}
+
+
 @router.post("/azure-devops")
 async def handle_azure_devops_webhook(
     payload: WebhookPayload,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """
-    Handle Azure DevOps webhook events
+    Handle Azure DevOps webhook events.
 
     Supported events:
     - git.pullrequest.created
@@ -28,122 +34,239 @@ async def handle_azure_devops_webhook(
 
     event_type = payload.eventType
     resource = payload.resource
+    notification_id = payload.notificationId
 
     logger.info(
         "webhook_received",
         event_type=event_type,
         subscription_id=payload.subscriptionId,
-        notification_id=payload.notificationId,
+        notification_id=notification_id,
     )
 
-    # Log webhook event
+    # ---------------------------------------------------------
+    # Ignore unsupported events
+    # ---------------------------------------------------------
+
+    if event_type not in SUPPORTED_EVENTS:
+        webhook_event = WebhookEvent(
+            tenant_id=None,
+            notification_id=notification_id,
+            event_type=event_type,
+            payload=json.dumps(payload.model_dump()),
+            processed=1,
+        )
+
+        try:
+            db.add(webhook_event)
+            db.commit()
+
+        except IntegrityError:
+            db.rollback()
+
+            existing_event = (
+                db.query(WebhookEvent)
+                .filter(
+                    WebhookEvent.notification_id == notification_id
+                )
+                .first()
+            )
+
+            if existing_event:
+                logger.info(
+                    "webhook_duplicate",
+                    notification_id=notification_id,
+                    existing_event_id=existing_event.id,
+                    event_type=event_type,
+                )
+
+                return {
+                    "status": "duplicate",
+                    "message": "Webhook notification already received",
+                    "notification_id": notification_id,
+                    "webhook_event_id": existing_event.id,
+                    "processed": existing_event.processed,
+                }
+
+            raise
+
+        logger.info(
+            "webhook_ignored",
+            event_type=event_type,
+            notification_id=notification_id,
+        )
+
+        return {
+            "status": "ignored",
+            "message": f"Event type '{event_type}' not supported",
+            "notification_id": notification_id,
+        }
+
+    # ---------------------------------------------------------
+    # Extract PR information
+    # ---------------------------------------------------------
+
+    pr_id = resource.get("pullRequestId")
+
+    repository = resource.get("repository") or {}
+    repository_id = repository.get("id")
+
+    if not pr_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Webhook payload is missing pullRequestId",
+        )
+
+    if not repository_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Webhook payload is missing repository.id",
+        )
+
+    # ---------------------------------------------------------
+    # Resolve tenant from registered repository
+    # ---------------------------------------------------------
+
+    registered_repository = (
+        db.query(Repository)
+        .filter(
+            Repository.external_repo_id == repository_id,
+            Repository.provider == "azure-devops",
+        )
+        .first()
+    )
+
+    if registered_repository is None:
+        logger.warning(
+            "webhook_repository_not_registered",
+            repository_id=repository_id,
+            pr_id=pr_id,
+            notification_id=notification_id,
+        )
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Repository '{repository_id}' is not registered "
+                "with DeployGuard"
+            ),
+        )
+
+    tenant_id = registered_repository.tenant_id
+
+    # ---------------------------------------------------------
+    # Atomically claim the notification
+    #
+    # The unique DB index on notification_id guarantees that
+    # concurrent duplicate requests cannot both create events.
+    # ---------------------------------------------------------
+
     webhook_event = WebhookEvent(
-        event_type=event_type, payload=json.dumps(payload.dict()), processed=0
+        tenant_id=tenant_id,
+        notification_id=notification_id,
+        event_type=event_type,
+        repository_id=repository_id,
+        pr_id=pr_id,
+        payload=json.dumps(payload.model_dump()),
+        processed=0,
     )
 
     try:
-        # Extract PR information
-        if event_type in ["git.pullrequest.created", "git.pullrequest.updated"]:
-            pr_id = resource.get("pullRequestId")
-            repository = resource.get("repository", {})
-            repository_id = repository.get("id")
-
-            webhook_event.pr_id = pr_id
-            webhook_event.repository_id = repository_id
-
-            db.add(webhook_event)
-            db.commit()
-
-            # Trigger analysis in background
-            background_tasks.add_task(
-                analyze_pr_background,
-                pr_id=pr_id,
-                repository_id=repository_id,
-                webhook_event_id=webhook_event.id,
-                db=db,
-            )
-
-            logger.info(
-                "webhook_queued_for_processing",
-                webhook_event_id=webhook_event.id,
-                pr_id=pr_id,
-                repository_id=repository_id,
-            )
-
-            return {
-                "status": "accepted",
-                "message": "PR analysis queued",
-                "pr_id": pr_id,
-            }
-
-        else:
-            webhook_event.processed = 1  # Mark as processed (ignored)
-            db.add(webhook_event)
-            db.commit()
-
-            logger.info("webhook_ignored", event_type=event_type)
-            return {
-                "status": "ignored",
-                "message": f"Event type '{event_type}' not supported",
-            }
-
-    except Exception as e:
-        webhook_event.processed = -1
-        webhook_event.error_message = str(e)
         db.add(webhook_event)
+
+        # Force INSERT now so IntegrityError is raised here,
+        # before we enqueue a Celery task.
+        db.flush()
+
+        db.commit()
+        db.refresh(webhook_event)
+
+    except IntegrityError:
+        db.rollback()
+
+        existing_event = (
+            db.query(WebhookEvent)
+            .filter(
+                WebhookEvent.notification_id == notification_id
+            )
+            .first()
+        )
+
+        if existing_event:
+            logger.info(
+                "webhook_duplicate",
+                notification_id=notification_id,
+                existing_event_id=existing_event.id,
+                existing_status=existing_event.processed,
+                event_type=event_type,
+            )
+
+            return {
+                "status": "duplicate",
+                "message": "Webhook notification already received",
+                "notification_id": notification_id,
+                "webhook_event_id": existing_event.id,
+                "processed": existing_event.processed,
+            }
+
+        logger.error(
+            "webhook_duplicate_detection_failed",
+            notification_id=notification_id,
+            repository_id=repository_id,
+            pr_id=pr_id,
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to determine webhook state",
+        )
+
+    # ---------------------------------------------------------
+    # Enqueue asynchronous analysis
+    # ---------------------------------------------------------
+
+    try:
+        task = analyze_pr_task.delay(
+            repository_id=repository_id,
+            pr_id=pr_id,
+            tenant_id=tenant_id,
+            webhook_event_id=webhook_event.id,
+        )
+
+    except Exception as exc:
+        # Celery enqueue failed after the event was persisted.
+        webhook_event.processed = -1
+        webhook_event.error_message = str(exc)
         db.commit()
 
-        logger.error("webhook_processing_failed", event_type=event_type, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-async def analyze_pr_background(
-    pr_id: int, repository_id: str, webhook_event_id: int, db: Session
-):
-    """Background task to analyze PR and post comment"""
-    try:
-        logger.info(
-            "webhook_background_started",
-            webhook_event_id=webhook_event_id,
-            pr_id=pr_id,
-            repository_id=repository_id,
-        )
-        analysis_service = AnalysisService(db)
-
-        # Run analysis and post comment
-        await analysis_service.analyze_and_comment_pr(
-            repository_id=repository_id, pr_id=pr_id
-        )
-
-        # Mark webhook as processed
-        webhook_event = (
-            db.query(WebhookEvent).filter(WebhookEvent.id == webhook_event_id).first()
-        )
-
-        if webhook_event:
-            webhook_event.processed = 1
-            db.commit()
-
-        logger.info(
-            "webhook_background_completed",
-            webhook_event_id=webhook_event_id,
-            pr_id=pr_id,
-        )
-
-    except Exception as e:
         logger.error(
-            "webhook_background_failed",
-            webhook_event_id=webhook_event_id,
-            pr_id=pr_id,
-            error=str(e),
+            "webhook_analysis_enqueue_failed",
+            webhook_event_id=webhook_event.id,
+            notification_id=notification_id,
+            task_error=str(exc),
         )
 
-        # Mark webhook as error
-        webhook_event = (
-            db.query(WebhookEvent).filter(WebhookEvent.id == webhook_event_id).first()
+        raise HTTPException(
+            status_code=503,
+            detail="Webhook accepted but analysis could not be queued",
         )
 
-        if webhook_event:
-            webhook_event.processed = -1
-            webhook_event.error_message = str(e)
-            db.commit()
+    logger.info(
+        "webhook_analysis_enqueued",
+        webhook_event_id=webhook_event.id,
+        task_id=task.id,
+        tenant_id=tenant_id,
+        pr_id=pr_id,
+        repository_id=repository_id,
+        notification_id=notification_id,
+    )
+
+    return {
+        "status": "accepted",
+        "message": "PR analysis queued",
+        "notification_id": notification_id,
+        "webhook_event_id": webhook_event.id,
+        "pr_id": pr_id,
+        "repository_id": repository_id,
+        "tenant_id": tenant_id,
+        "task_id": task.id,
+    }
