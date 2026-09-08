@@ -100,7 +100,9 @@ def test_graph_contains_expected_relationships():
         ]
     )
 
-    relationships = {edge.relationship for edge in result.edges}
-
+    relationships = {
+        edge.relationship
+        for edge in result.edges
+    }
     assert "belongs_to" in relationships
     assert "affects" in relationships
