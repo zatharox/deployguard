@@ -1,0 +1,456 @@
+.pr-analysis-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.pr-analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.pr-analysis-header h1 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.back-link {
+  display: inline-flex;
+  margin-bottom: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--brand);
+}
+
+.pr-title {
+  margin: 10px 0 4px;
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+.repository-name {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-family:
+    'JetBrains Mono',
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    monospace;
+  font-size: 12px;
+}
+
+.external-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 10px 14px;
+
+  border: 1px solid rgba(34, 211, 238, 0.15);
+  border-radius: 8px;
+
+  background: rgba(34, 211, 238, 0.04);
+
+  color: var(--brand);
+
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.external-link:hover {
+  background: rgba(34, 211, 238, 0.08);
+  border-color: rgba(34, 211, 238, 0.3);
+}
+
+/* =========================================================
+   Risk overview
+   ========================================================= */
+
+.risk-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.risk-score-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 130px;
+}
+
+.risk-score {
+  margin-top: 12px;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.risk-score.risk-high {
+  color: var(--danger);
+  background: transparent;
+}
+
+.risk-score.risk-medium {
+  color: var(--warning);
+  background: transparent;
+}
+
+.risk-score.risk-low {
+  color: var(--success);
+  background: transparent;
+}
+
+.risk-score.risk-unknown {
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.risk-pill {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.risk-pill.risk-high {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.risk-pill.risk-medium {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.risk-pill.risk-low {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.risk-pill.risk-unknown {
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+}
+
+/* =========================================================
+   Main analysis sections
+   ========================================================= */
+
+.pr-analysis-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.section-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.section-header p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* =========================================================
+   Risk signals
+   ========================================================= */
+
+.signal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.risk-signal {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  padding: 12px;
+
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  border-radius: 8px;
+
+  background: rgba(69, 10, 10, 0.25);
+
+  color: var(--text-secondary);
+
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.signal-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+
+  border-radius: 50%;
+
+  background: var(--danger-bg);
+  color: var(--danger);
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* =========================================================
+   Recommendation
+   ========================================================= */
+
+.recommendation {
+  padding: 16px;
+
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  border-radius: 8px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(139, 92, 246, 0.08),
+      rgba(34, 211, 238, 0.03)
+    );
+
+  color: var(--text-secondary);
+
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* =========================================================
+   Change Intelligence
+   ========================================================= */
+
+.change-intelligence-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.change-intelligence-metrics > div {
+  padding: 16px;
+
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+
+  background: var(--bg-secondary);
+}
+
+.change-intelligence-metrics span {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: var(--text-muted);
+
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.change-intelligence-metrics strong {
+  display: block;
+
+  color: var(--intelligence-light);
+
+  font-size: 22px;
+}
+
+/* =========================================================
+   Change Graph
+   ========================================================= */
+
+.change-graph-container {
+  width: 100%;
+  min-height: 500px;
+
+  overflow: hidden;
+
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(139, 92, 246, 0.04),
+      transparent 60%
+    ),
+    var(--bg-secondary);
+}
+
+.change-graph-container > * {
+  width: 100%;
+}
+
+/* =========================================================
+   Changed Files
+   ========================================================= */
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  max-height: 420px;
+
+  overflow-y: auto;
+}
+
+.file-item {
+  display: block;
+
+  padding: 10px 12px;
+
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+
+  background: var(--bg-secondary);
+
+  color: var(--brand-light);
+
+  font-size: 12px;
+
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.file-item:hover {
+  border-color: rgba(34, 211, 238, 0.3);
+  background: var(--bg-elevated);
+}
+
+/* =========================================================
+   Empty / error states
+   ========================================================= */
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 100px;
+
+  color: var(--text-muted);
+
+  font-size: 14px;
+}
+
+.state-card {
+  padding: 28px;
+
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+
+  background: var(--bg-card);
+
+  box-shadow: var(--shadow-sm);
+}
+
+.state-card h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.state-card p {
+  color: var(--text-muted);
+}
+
+.error-card {
+  border-color: rgba(239, 68, 68, 0.3);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(69, 10, 10, 0.35),
+      var(--bg-card)
+    );
+}
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media (max-width: 1100px) {
+  .risk-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .change-intelligence-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .pr-analysis-page {
+    padding: 16px;
+  }
+
+  .pr-analysis-header {
+    flex-direction: column;
+  }
+
+  .pr-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .external-link {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .risk-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .change-intelligence-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .pr-analysis-header h1 {
+    font-size: 26px;
+  }
+
+  .risk-score {
+    font-size: 34px;
+  }
+}
