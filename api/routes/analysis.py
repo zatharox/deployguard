@@ -7,7 +7,10 @@ import json
 import structlog
 
 from db.database import get_db
-from db.schemas import PRAnalysisSchema, FileHistorySchema
+from db.schemas import (
+    PRAnalysisSchema,
+    FileHistorySchema,
+)
 from db.models import PRAnalysis, FileHistory, PipelineHistory
 from services.analysis_service import AnalysisService
 from services.auth_service import require_api_key, require_roles
@@ -15,6 +18,7 @@ from services.metering_service import record_usage_event
 from services.plan_service import enforce_analysis_quota
 from engine.risk_analyzer import RiskEngine
 from engine.change_graph import ChangeGraphAnalyzer
+
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -256,7 +260,16 @@ async def run_demo_scenario(
     # Generate structural change intelligence for the demo scenario.
     change_graph = change_graph_analyzer.analyze(files)
 
-    changes_data["changeGraph"] = change_graph.to_dict()
+    # Capture the same immutable file-impact snapshot used by
+    # the normal AnalysisService flow.
+    change_graph_data = change_graph.to_dict()
+    change_graph_data["file_impacts"] = (
+        analysis_service._build_file_impacts(
+            change_graph=change_graph_data,
+        )
+    )
+
+    changes_data["changeGraph"] = change_graph_data
 
     logger.info(
         "demo_change_graph_analysis_completed",
@@ -429,6 +442,55 @@ async def analyze_pr_manual(
         )
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get(
+    "/history",
+    response_model=List[PRAnalysisSchema],
+    summary="📚 Get All PR Analysis History",
+    description="Retrieve the latest analysis for each Pull Request",
+)
+async def get_all_pr_analysis_history(
+    limit: int = 50,
+    auth=Depends(require_roles(["owner", "admin", "manager", "reviewer", "viewer"])),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the latest analysis for each Pull Request for the current tenant.
+
+    The endpoint is intended for:
+    - Pull Request lists
+    - Dashboard recent analyses
+    - Risk overview tables
+
+    Only the newest analysis for each PR is returned.
+    """
+
+    tenant = auth["tenant"]
+
+    # Fetch all analyses for this tenant, newest first.
+    analyses = (
+        db.query(PRAnalysis)
+        .filter(PRAnalysis.tenant_id == tenant.id)
+        .order_by(PRAnalysis.pr_id, PRAnalysis.analyzed_at.desc())
+        .all()
+    )
+
+    # Keep only the newest analysis for each PR.
+    latest_by_pr = {}
+
+    for analysis in analyses:
+        if analysis.pr_id not in latest_by_pr:
+            latest_by_pr[analysis.pr_id] = analysis
+
+    # Return newest analyses first.
+    result = sorted(
+        latest_by_pr.values(),
+        key=lambda analysis: analysis.analyzed_at,
+        reverse=True,
+    )
+
+    limited_results = result[: max(1, min(limit, 100))]
+
+    return limited_results
 
 @router.get(
     "/history/{pr_id}",

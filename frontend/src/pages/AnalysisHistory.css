@@ -1,34 +1,50 @@
 .history-page {
   max-width: 1400px;
   margin: 0 auto;
+  padding: 24px;
 }
+
+/* =========================================================
+   Header
+   ========================================================= */
 
 .history-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 24px;
   margin-bottom: 24px;
 }
 
 .history-header h1 {
-  margin: 0 0 8px;
+  margin: 0;
+  color: var(--text-primary);
   font-size: 32px;
+  line-height: 1.2;
 }
 
 .history-header p {
-  margin: 0;
-  color: #666;
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
 
 .refresh-button {
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 18px;
-  background: #111827;
-  color: white;
+  background: var(--bg-card);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 14px;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--brand);
 }
 
 .refresh-button:disabled {
@@ -36,97 +52,289 @@
   cursor: not-allowed;
 }
 
+/* =========================================================
+   Summary
+   ========================================================= */
+
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.history-stat {
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.history-stat span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.history-stat strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* =========================================================
+   Filters
+   ========================================================= */
+
+.history-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.history-search,
+.history-risk-filter {
+  min-height: 42px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.history-search {
+  flex: 1;
+  min-width: 0;
+  padding: 0 13px;
+}
+
+.history-risk-filter {
+  min-width: 180px;
+  padding: 0 13px;
+}
+
+.history-search::placeholder {
+  color: var(--text-muted);
+}
+
+.history-search:focus,
+.history-risk-filter:focus {
+  border-color: var(--brand);
+}
+
+/* =========================================================
+   States
+   ========================================================= */
+
 .state-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 32px;
-  background: white;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .state-card h2 {
-  margin-top: 0;
+  margin: 0 0 8px;
+  color: var(--text-primary);
 }
 
 .state-card p {
-  color: #6b7280;
+  margin: 0;
+  color: var(--text-muted);
 }
 
 .error-card {
-  border-color: #fecaca;
-  background: #fff7f7;
+  border-color: rgba(239, 68, 68, 0.35);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(69, 10, 10, 0.3),
+      var(--bg-card)
+    );
 }
 
 .error-card button {
-  margin-top: 12px;
-  border: none;
+  margin-top: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
   border-radius: 8px;
   padding: 10px 16px;
-  background: #dc2626;
-  color: white;
+  background: var(--danger-bg);
+  color: var(--danger);
   cursor: pointer;
 }
 
+/* =========================================================
+   Table
+   ========================================================= */
+
 .history-table-wrapper {
   overflow-x: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  background: white;
+  background: var(--bg-card);
 }
 
 .history-table {
   width: 100%;
+  min-width: 1100px;
   border-collapse: collapse;
-  min-width: 1000px;
 }
 
 .history-table th,
 .history-table td {
   padding: 14px 16px;
   text-align: left;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .history-table th {
-  background: #f9fafb;
-  color: #374151;
-  font-size: 13px;
-  font-weight: 600;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .history-table td {
+  color: var(--text-secondary);
   font-size: 14px;
-  color: #1f2937;
+}
+
+.history-table tbody tr {
+  transition: background 0.15s ease;
 }
 
 .history-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--bg-elevated);
 }
 
 .history-table tbody tr:last-child td {
   border-bottom: none;
 }
 
+/* =========================================================
+   PR links / titles
+   ========================================================= */
+
+.pr-link {
+  color: var(--brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.pr-link:hover {
+  text-decoration: underline;
+}
+
+.pr-title-cell {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-risk-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =========================================================
+   Risk badges
+   ========================================================= */
+
 .risk-badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: 4px 9px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
 .risk-high {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .risk-medium {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 
 .risk-low {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.risk-unknown {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+/* =========================================================
+   Blast radius
+   ========================================================= */
+
+.blast-radius-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.blast-radius-cell strong {
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.blast-radius-cell span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media (max-width: 900px) {
+  .history-page {
+    padding: 16px;
+  }
+
+  .history-header {
+    flex-direction: column;
+  }
+
+  .history-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-filters {
+    flex-direction: column;
+  }
+
+  .history-risk-filter {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .history-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .history-header h1 {
+    font-size: 26px;
+  }
 }

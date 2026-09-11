@@ -32,9 +32,7 @@ export interface ChangeGraph {
   changed_files?: string[];
   components?: string[];
   critical_areas?: string[];
-
   blast_radius?: BlastRadius;
-
   nodes?: ChangeGraphNode[];
   edges?: ChangeGraphEdge[];
 
@@ -44,12 +42,19 @@ export interface ChangeGraph {
   blast_radius_score?: number;
   blast_radius_level?: string;
   confidence?: string;
+  file_impacts?: FileImpact[];
+}
+export interface DeploymentDecision {
+  status: string;
+  label: string;
+  reason: string;
+  blocking: boolean;
+  policy_version: string;
 }
 
 export interface Analysis {
   id: number;
   pr_id: number;
-
   repository_id?: string;
 
   risk_score: number;
@@ -59,14 +64,16 @@ export interface Analysis {
   pr_author?: string;
 
   files_changed?: number;
-
   analyzed_at?: string;
 
   recommendation?: string;
+  signals?: RiskSignal[];
+  recommendations?: string[];
 
   change_graph?: ChangeGraph | null;
-}
 
+  deployment_decision?: DeploymentDecision | null;
+}
 export interface DashboardSummary {
   tenant: string;
   total_analyses: number;
@@ -75,14 +82,28 @@ export interface DashboardSummary {
   unstable_files: number;
 }
 
+export interface RiskSignal {
+  name: string;
+  score: number;
+  description: string;
+  details?: string;
+}
+
+export interface FileImpact {
+  file_path: string;
+  change_count: number;
+  failure_count: number;
+  failure_rate: number;
+  last_modified?: string | null;
+  impact_level: string;
+  historical_data_available: boolean;
+}
 export interface UnstableFile {
   file_path?: string;
   path?: string;
   file?: string;
   name?: string;
-
   risk?: string | number;
-
   failure_rate?: number;
   failureRate?: number;
 }
@@ -284,6 +305,52 @@ export async function apiFetch<T>(
    Analysis APIs
    ========================================================= */
 
+function normalizeAnalysis(
+  analysis: Analysis,
+): Analysis {
+  return {
+    ...analysis,
+
+    change_graph: analysis.change_graph
+      ? {
+          ...analysis.change_graph,
+
+          blast_radius_score:
+            analysis.change_graph.blast_radius
+              ?.score,
+
+          blast_radius_level:
+            analysis.change_graph.blast_radius
+              ?.level,
+
+          confidence:
+            analysis.change_graph.blast_radius
+              ?.confidence,
+        }
+      : null,
+  };
+}
+
+export async function getAllHistory(): Promise<Analysis[]> {
+  const data = await apiFetch<
+    | Analysis[]
+    | {
+        analyses?: Analysis[];
+        history?: Analysis[];
+      }
+  >(
+    '/api/v1/analysis/history',
+  );
+
+  const records = Array.isArray(data)
+    ? data
+    : data.analyses ??
+      data.history ??
+      [];
+
+  return records.map(normalizeAnalysis);
+}
+
 export async function getHistory(
   prId: number,
 ): Promise<Analysis[]> {
@@ -303,31 +370,7 @@ export async function getHistory(
       data.history ??
       [];
 
-  return records.map((analysis) => ({
-    ...analysis,
-
-    /*
-     * Normalize the nested backend blast-radius
-     * object into fields convenient for the UI.
-     */
-    change_graph: analysis.change_graph
-      ? {
-          ...analysis.change_graph,
-
-          blast_radius_score:
-            analysis.change_graph.blast_radius
-              ?.score,
-
-          blast_radius_level:
-            analysis.change_graph.blast_radius
-              ?.level,
-
-          confidence:
-            analysis.change_graph.blast_radius
-              ?.confidence,
-        }
-      : null,
-  }));
+  return records.map(normalizeAnalysis);
 }
 
 export async function getPRDetails(

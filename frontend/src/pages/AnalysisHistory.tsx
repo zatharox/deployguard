@@ -1,34 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import './AnalysisHistory.css';
-
 import {
-  getHistory,
+  getAllHistory,
   type Analysis,
 } from '../api/client';
 
+import './AnalysisHistory.css';
+
 export default function AnalysisHistory() {
-  const [analyses, setAnalyses] =
-    useState<Analysis[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState('');
-
-  useEffect(() => {
-    loadHistory();
-  }, []);
+  const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [riskFilter, setRiskFilter] =
+    useState<'all' | 'high' | 'medium' | 'low'>('all');
 
   async function loadHistory() {
     try {
       setLoading(true);
       setError('');
 
-      const data = await getHistory(999);
-
+      const data = await getAllHistory();
       setAnalyses(data);
     } catch (err) {
       const message =
@@ -41,6 +34,41 @@ export default function AnalysisHistory() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    void loadHistory();
+  }, []);
+
+  const filteredAnalyses = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return analyses.filter((analysis) => {
+      const matchesSearch =
+        !query ||
+        String(analysis.pr_id).includes(query) ||
+        analysis.pr_title?.toLowerCase().includes(query) ||
+        analysis.pr_author?.toLowerCase().includes(query) ||
+        analysis.repository_id?.toLowerCase().includes(query);
+
+      const matchesRisk =
+        riskFilter === 'all' ||
+        analysis.risk_level.toLowerCase() === riskFilter;
+
+      return matchesSearch && matchesRisk;
+    });
+  }, [analyses, search, riskFilter]);
+
+  const highRiskCount = analyses.filter(
+    (analysis) => analysis.risk_level.toLowerCase() === 'high',
+  ).length;
+
+  const mediumRiskCount = analyses.filter(
+    (analysis) => analysis.risk_level.toLowerCase() === 'medium',
+  ).length;
+
+  const lowRiskCount = analyses.filter(
+    (analysis) => analysis.risk_level.toLowerCase() === 'low',
+  ).length;
 
   function getRiskClass(level: string) {
     switch (level.toLowerCase()) {
@@ -76,13 +104,9 @@ export default function AnalysisHistory() {
     <div className="history-page">
       <div className="history-header">
         <div>
-          <p className="eyebrow">
-            ANALYSIS HISTORY
-          </p>
+          <p className="eyebrow">ANALYSIS HISTORY</p>
 
-          <h1>
-            Analysis History
-          </h1>
+          <h1>Analysis History</h1>
 
           <p>
             Review previous DeployGuard analyses,
@@ -96,17 +120,78 @@ export default function AnalysisHistory() {
           disabled={loading}
           className="refresh-button"
         >
-          {loading
-            ? 'Refreshing...'
-            : 'Refresh'}
+          {loading ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
+      {/* Summary */}
+
+      <div className="history-summary">
+        <div className="history-stat">
+          <span>Total PRs</span>
+          <strong>{analyses.length}</strong>
+        </div>
+
+        <div className="history-stat">
+          <span>High Risk</span>
+          <strong className="risk-high">
+            {highRiskCount}
+          </strong>
+        </div>
+
+        <div className="history-stat">
+          <span>Medium Risk</span>
+          <strong className="risk-medium">
+            {mediumRiskCount}
+          </strong>
+        </div>
+
+        <div className="history-stat">
+          <span>Low Risk</span>
+          <strong className="risk-low">
+            {lowRiskCount}
+          </strong>
+        </div>
+      </div>
+
+      {/* Filters */}
+
+      <div className="history-filters">
+        <input
+          type="text"
+          className="history-search"
+          placeholder="Search PRs, authors, repositories..."
+          value={search}
+          onChange={(event) =>
+            setSearch(event.target.value)
+          }
+        />
+
+        <select
+          className="history-risk-filter"
+          value={riskFilter}
+          onChange={(event) =>
+            setRiskFilter(
+              event.target.value as
+                | 'all'
+                | 'high'
+                | 'medium'
+                | 'low',
+            )
+          }
+        >
+          <option value="all">All Risk Levels</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+
+      {/* Loading */}
+
       {loading && (
         <div className="state-card">
-          <h2>
-            Loading analysis history...
-          </h2>
+          <h2>Loading analysis history...</h2>
 
           <p>
             Fetching the latest DeployGuard
@@ -115,11 +200,11 @@ export default function AnalysisHistory() {
         </div>
       )}
 
+      {/* Error */}
+
       {!loading && error && (
         <div className="state-card error-card">
-          <h2>
-            Unable to load history
-          </h2>
+          <h2>Unable to load history</h2>
 
           <p>{error}</p>
 
@@ -132,33 +217,35 @@ export default function AnalysisHistory() {
         </div>
       )}
 
+      {/* Empty */}
+
       {!loading &&
         !error &&
-        analyses.length === 0 && (
+        filteredAnalyses.length === 0 && (
           <div className="state-card">
-            <h2>
-              No analyses found
-            </h2>
+            <h2>No analyses found</h2>
 
             <p>
-              DeployGuard has not stored any
-              analysis results for this PR yet.
+              {analyses.length === 0
+                ? 'DeployGuard has not stored any analysis results yet.'
+                : 'Try changing your search or risk filter.'}
             </p>
           </div>
         )}
 
+      {/* Table */}
+
       {!loading &&
         !error &&
-        analyses.length > 0 && (
+        filteredAnalyses.length > 0 && (
           <div className="history-table-wrapper">
             <table className="history-table">
               <thead>
                 <tr>
-                  <th>Analysis</th>
                   <th>PR</th>
                   <th>Title</th>
-                  <th>Risk Score</th>
-                  <th>Risk Level</th>
+                  <th>Author</th>
+                  <th>Risk</th>
                   <th>Blast Radius</th>
                   <th>Files</th>
                   <th>Components</th>
@@ -168,7 +255,7 @@ export default function AnalysisHistory() {
               </thead>
 
               <tbody>
-                {analyses.map((analysis) => {
+                {filteredAnalyses.map((analysis) => {
                   const graph =
                     analysis.change_graph;
 
@@ -185,22 +272,26 @@ export default function AnalysisHistory() {
                     graph?.confidence ??
                     '—';
 
-                  const score =
+                  const blastScore =
                     blastRadius?.score ??
                     graph?.blast_radius_score;
 
+                  const filesChanged =
+                    graph?.changed_files?.length ??
+                    analysis.files_changed ??
+                    0;
+
+                  const componentCount =
+                    graph?.components?.length ?? 0;
+
                   return (
                     <tr key={analysis.id}>
-                      <td>
-                        #{analysis.id}
-                      </td>
-
                       <td>
                         <Link
                           to={`/prs/${analysis.pr_id}`}
                           className="pr-link"
                         >
-                          PR #{analysis.pr_id}
+                          #{analysis.pr_id}
                         </Link>
                       </td>
 
@@ -212,21 +303,25 @@ export default function AnalysisHistory() {
                       </td>
 
                       <td>
-                        <strong>
-                          {Number(
-                            analysis.risk_score,
-                          ).toFixed(1)}
-                        </strong>
+                        {analysis.pr_author ?? '—'}
                       </td>
 
                       <td>
-                        <span
-                          className={`risk-badge ${getRiskClass(
-                            analysis.risk_level,
-                          )}`}
-                        >
-                          {analysis.risk_level}
-                        </span>
+                        <div className="history-risk-cell">
+                          <span
+                            className={`risk-badge ${getRiskClass(
+                              analysis.risk_level,
+                            )}`}
+                          >
+                            {analysis.risk_level.toUpperCase()}
+                          </span>
+
+                          <strong>
+                            {Number(
+                              analysis.risk_score,
+                            ).toFixed(1)}
+                          </strong>
+                        </div>
                       </td>
 
                       <td>
@@ -235,30 +330,22 @@ export default function AnalysisHistory() {
                             {blastLevel}
                           </strong>
 
-                          {score !== undefined && (
+                          {blastScore !== undefined && (
                             <span>
-                              Score {score}
+                              Score{' '}
+                              {Number(
+                                blastScore,
+                              ).toFixed(1)}
                             </span>
                           )}
                         </div>
                       </td>
 
-                      <td>
-                        {graph
-                          ?.changed_files
-                          ?.length ??
-                          analysis.files_changed ??
-                          0}
-                      </td>
+                      <td>{filesChanged}</td>
 
-                      <td>
-                        {graph?.components
-                          ?.length ?? 0}
-                      </td>
+                      <td>{componentCount}</td>
 
-                      <td>
-                        {confidence}
-                      </td>
+                      <td>{confidence}</td>
 
                       <td>
                         {formatDate(

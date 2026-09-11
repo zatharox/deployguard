@@ -1,22 +1,40 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
-import Icon from './Icon'
+import React from 'react';
+import { Link } from 'react-router-dom';
+import Icon from './Icon';
 
 export default function Header() {
   return (
     <header className="app-header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="logo">DeployGuard</div>
-        <nav style={{ display: 'flex', gap: 12 }}>
-          <Link to="/" className="nav-link"><Icon name="home" /> Dashboard</Link>
-          <Link to="/prs" className="nav-link"><Icon name="repo" /> PRs</Link>
-          <Link to="/history" className="nav-link"><Icon name="history" /> History</Link>
-        </nav>
+      <div className="app-header-left">
+        <Link
+          to="/"
+          className="logo"
+          aria-label="DeployGuard Dashboard"
+        >
+          DeployGuard
+        </Link>
+
+        <span className="header-divider" />
+
+        <span className="header-context">
+          Deployment Intelligence
+        </span>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <Link to="/settings" className="nav-link"><Icon name="cog" /> Settings</Link>
+      <div className="app-header-right">
+        <div className="header-status">
+          <span className="header-status-dot" />
+          <span>System Operational</span>
+        </div>
+
+        <Link
+          to="/settings"
+          className="header-settings"
+          aria-label="Settings"
+        >
+          <Icon name="cog" />
+        </Link>
       </div>
     </header>
-  )
+  );
 }

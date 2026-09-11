@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+from engine.deployment_policy import DeploymentPolicy
 from dataclasses import dataclass
 from datetime import datetime
 import re
@@ -30,6 +31,7 @@ class RiskAnalysisResult:
     recommendations: List[str]
     analysis_id: Optional[int] = None
     change_graph: Optional[Dict] = None
+    deployment_decision: Optional[Dict] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -53,6 +55,7 @@ class RiskAnalysisResult:
             ],
             "recommendations": self.recommendations,
             "change_graph": self.change_graph,
+            "deployment_decision": self.deployment_decision,
         }
 
 
@@ -61,6 +64,7 @@ class RiskEngine:
 
     def __init__(self):
         self.settings = get_settings()
+        self.deployment_policy = DeploymentPolicy()
 
     async def analyze_pr(
         self,
@@ -126,6 +130,13 @@ class RiskEngine:
         else:
             risk_level = "low"
 
+        deployment_decision = self.deployment_policy.evaluate(
+                risk_level=risk_level,
+                risk_score=total_risk,
+                change_graph=changes_data.get("changeGraph"),
+            )
+
+
         recommendations = self._generate_recommendations(
             signals,
             risk_level,
@@ -144,6 +155,7 @@ class RiskEngine:
             signals=signals,
             recommendations=recommendations,
             change_graph=changes_data.get("changeGraph"),
+            deployment_decision=deployment_decision.to_dict(),
         )
 
     def _analyze_blast_radius(
