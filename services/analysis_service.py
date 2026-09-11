@@ -21,14 +21,23 @@ class AnalysisService:
         self,
         db: Session,
         tenant_id: int | None = None,
+        correlation_id: str | None = None,
     ):
         self.db = db
         self.tenant_id = tenant_id
+        self.correlation_id = correlation_id
+
+        self.logger = logger.bind(
+            correlation_id=correlation_id,
+            tenant_id=tenant_id,
+        )
 
         settings = get_settings()
 
         self.azure_client = (
-            MockAzureDevOpsClient() if settings.demo_mode else AzureDevOpsClient()
+            MockAzureDevOpsClient()
+            if settings.demo_mode
+            else AzureDevOpsClient()
         )
 
         self.risk_engine = RiskEngine()
@@ -52,7 +61,7 @@ class AnalysisService:
         7. Persist result.
         """
 
-        logger.info(
+        self.logger.info(   
             "starting_pr_analysis",
             pr_id=pr_id,
             repository_id=repository_id,
@@ -91,9 +100,7 @@ class AnalysisService:
             for entry in changes_data.get("changeEntries", [])
         ]
 
-        change_graph = self.change_graph_analyzer.analyze(
-            changed_files
-        )
+        change_graph = self.change_graph_analyzer.analyze(changed_files)
 
         changes_data["changeGraph"] = change_graph.to_dict()
 
@@ -101,6 +108,22 @@ class AnalysisService:
         # 4. Historical file risk.
         # ---------------------------------------------------------
         file_history = self._get_file_history_dict()
+
+        # ---------------------------------------------------------
+        # 4a. Capture immutable file-impact snapshot.
+        # ---------------------------------------------------------
+        file_impacts = self._build_file_impacts(
+            change_graph=change_graph.to_dict(),
+        )
+
+        changes_data["fileImpacts"] = file_impacts
+
+        # Keep the file-impact snapshot inside the persisted
+        # change graph so historical analyses do not change when
+        # current FileHistory records change later.
+        change_graph_data = change_graph.to_dict()
+        change_graph_data["file_impacts"] = file_impacts
+        changes_data["changeGraph"] = change_graph_data
 
         # ---------------------------------------------------------
         # 5. Pipeline statistics.
@@ -129,7 +152,7 @@ class AnalysisService:
 
         result.analysis_id = analysis.id
 
-        logger.info(
+        self.logger.info(
             "pr_analysis_completed",
             analysis_id=analysis.id,
             pr_id=pr_id,
@@ -181,7 +204,119 @@ class AnalysisService:
         files = query.all()
 
         return {file.file_path: file.failure_rate for file in files}
+    
+    def _build_file_impacts(
+        self,
+        change_graph: Dict,
+    ) -> list[Dict]:
+        """
+        Build an immutable file-impact snapshot for the current analysis.
 
+        File impacts are derived from the current FileHistory records for
+        files identified by Change Intelligence.
+
+        The snapshot is stored inside change_graph so historical analyses
+        retain the exact file-impact state that existed at analysis time.
+        """
+
+        changed_files = list(
+            change_graph.get("changed_files") or []
+        )
+
+        if not changed_files:
+            return []
+
+        query = self.db.query(FileHistory).filter(
+            FileHistory.file_path.in_(changed_files)
+        )
+
+        if self.tenant_id is not None:
+            query = query.filter(
+                FileHistory.tenant_id == self.tenant_id
+            )
+
+        history_records = query.all()
+
+        history_by_path = {
+            record.file_path: record
+            for record in history_records
+        }
+
+        file_impacts: list[Dict] = []
+
+        for file_path in changed_files:
+            history = history_by_path.get(file_path)
+
+            # No historical record for this file.
+            if history is None:
+                file_impacts.append(
+                    {
+                        "file_path": file_path,
+                        "change_count": 0,
+                        "failure_count": 0,
+                        "failure_rate": 0.0,
+                        "last_modified": None,
+                        "impact_level": "unknown",
+                        "historical_data_available": False,
+                    }
+                )
+                continue
+
+            failure_rate = float(
+                history.failure_rate or 0.0
+            )
+
+            # Deterministic file-impact classification.
+            if failure_rate >= 0.20:
+                impact_level = "high"
+            elif failure_rate >= 0.10:
+                impact_level = "medium"
+            elif failure_rate > 0:
+                impact_level = "low"
+            else:
+                impact_level = "none"
+
+            last_modified = None
+
+            if history.last_modified is not None:
+                last_modified = (
+                    history.last_modified.isoformat()
+                    if hasattr(history.last_modified, "isoformat")
+                    else str(history.last_modified)
+                )
+
+            file_impacts.append(
+                {
+                    "file_path": file_path,
+                    "change_count": int(
+                        history.change_count or 0
+                    ),
+                    "failure_count": int(
+                        history.failure_count or 0
+                    ),
+                    "failure_rate": failure_rate,
+                    "last_modified": last_modified,
+                    "impact_level": impact_level,
+                    "historical_data_available": True,
+                }
+            )
+
+        self.logger.info(
+            "file_impacts_built",
+            files_analyzed=len(file_impacts),
+            files_with_history=sum(
+                1
+                for impact in file_impacts
+                if impact["historical_data_available"]
+            ),
+            high_impact_files=sum(
+                1
+                for impact in file_impacts
+                if impact["impact_level"] == "high"
+            ),
+        )
+
+        return file_impacts
     async def _get_pipeline_stats(self) -> Dict:
         """
         Calculate pipeline statistics from recent runs.
@@ -307,7 +442,7 @@ class AnalysisService:
         self.db.commit()
         self.db.refresh(pr_analysis)
 
-        logger.info(
+        self.logger.info(
             "analysis_saved_to_database",
             analysis_id=pr_analysis.id,
             pr_id=pr_analysis.pr_id,
@@ -351,7 +486,7 @@ class AnalysisService:
 
         self.db.commit()
 
-        logger.info(
+        self.logger.info(
             "file_history_updated",
             file_path=file_path,
             failure_rate=file_history.failure_rate,

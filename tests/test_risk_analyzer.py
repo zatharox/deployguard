@@ -1,6 +1,7 @@
 import pytest
 
-from engine.risk_analyzer import RiskEngine,RiskAnalysisResult
+from engine.risk_analyzer import RiskEngine, RiskAnalysisResult
+
 
 def test_total_risk_score_is_capped_at_ten():
     raw_score = sum(
@@ -21,6 +22,7 @@ def test_total_risk_score_is_capped_at_ten():
 
     assert raw_score == pytest.approx(12.6)
     assert normalized_score == pytest.approx(10.0)
+
 
 def test_blast_radius_signal_is_bounded():
     engine = RiskEngine()
@@ -73,7 +75,6 @@ def test_blast_radius_signal_is_bounded():
     assert signal.score == 2.0
     assert "Broad structural blast radius" in signal.description
     assert "authentication" in signal.details
-
 
 
 def test_risk_analysis_result_includes_change_graph():

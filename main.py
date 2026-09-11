@@ -9,8 +9,12 @@ from contextlib import asynccontextmanager
 from config import get_settings
 from api.routes import webhook, analysis, health, enterprise, auth
 from api.routes import azure_connectivity, admin
-from db.database import engine, Base , ensure_schema
-from services.logging_utils import bind_log_context, clear_log_context, get_request_id
+from db.database import engine, Base, ensure_schema
+from services.logging_utils import (
+    bind_log_context,
+    clear_log_context,
+    get_request_id,
+)
 from services.cache_service import cache_service
 from services.rate_limiter import rate_limit_middleware
 
@@ -49,7 +53,6 @@ async def lifespan(app: FastAPI):
     await cache_service.close()
 
     logger.info("shutting_down_deployguard")
-
 
 
 # Initialize FastAPI app with enhanced styling
@@ -172,7 +175,18 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:5176",
+        "http://localhost:5177",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:5176",
+        "http://127.0.0.1:5177",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1005,7 +1019,6 @@ async def landing_page():
     </body>
     </html>
     """
-
 
 
 if __name__ == "__main__":

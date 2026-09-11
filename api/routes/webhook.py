@@ -1,15 +1,19 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+
 import json
 import structlog
+import uuid
 
 from db.database import get_db
 from db.models import WebhookEvent, Repository
 from db.schemas import WebhookPayload
 from services.tasks import analyze_pr_task
 
+
 router = APIRouter()
+
 logger = structlog.get_logger()
 
 
@@ -102,6 +106,15 @@ async def handle_azure_devops_webhook(
         }
 
     # ---------------------------------------------------------
+    # Generate correlation ID
+    #
+    # This ID is shared across:
+    # Webhook → Celery → AnalysisService → lifecycle logs
+    # ---------------------------------------------------------
+
+    correlation_id = str(uuid.uuid4())
+
+    # ---------------------------------------------------------
     # Extract PR information
     # ---------------------------------------------------------
 
@@ -141,6 +154,7 @@ async def handle_azure_devops_webhook(
             repository_id=repository_id,
             pr_id=pr_id,
             notification_id=notification_id,
+            correlation_id=correlation_id,
         )
 
         raise HTTPException(
@@ -176,7 +190,6 @@ async def handle_azure_devops_webhook(
         # Force INSERT now so IntegrityError is raised here,
         # before we enqueue a Celery task.
         db.flush()
-
         db.commit()
         db.refresh(webhook_event)
 
@@ -213,6 +226,7 @@ async def handle_azure_devops_webhook(
             notification_id=notification_id,
             repository_id=repository_id,
             pr_id=pr_id,
+            correlation_id=correlation_id,
         )
 
         raise HTTPException(
@@ -230,6 +244,7 @@ async def handle_azure_devops_webhook(
             pr_id=pr_id,
             tenant_id=tenant_id,
             webhook_event_id=webhook_event.id,
+            correlation_id=correlation_id,
         )
 
     except Exception as exc:
@@ -243,6 +258,10 @@ async def handle_azure_devops_webhook(
             webhook_event_id=webhook_event.id,
             notification_id=notification_id,
             task_error=str(exc),
+            correlation_id=correlation_id,
+            repository_id=repository_id,
+            pr_id=pr_id,
+            tenant_id=tenant_id,
         )
 
         raise HTTPException(
@@ -258,6 +277,7 @@ async def handle_azure_devops_webhook(
         pr_id=pr_id,
         repository_id=repository_id,
         notification_id=notification_id,
+        correlation_id=correlation_id,
     )
 
     return {
@@ -269,4 +289,5 @@ async def handle_azure_devops_webhook(
         "repository_id": repository_id,
         "tenant_id": tenant_id,
         "task_id": task.id,
+        "correlation_id": correlation_id,
     }

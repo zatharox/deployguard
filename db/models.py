@@ -189,6 +189,7 @@ class PipelineHistory(Base):
         Index("idx_tenant_pipeline", "tenant_id", "pipeline_id"),
     )
 
+
 class WebhookEvent(Base):
     __tablename__ = "webhook_events"
 
